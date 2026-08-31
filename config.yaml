@@ -1,0 +1,38 @@
+timezone: Australia/Sydney
+horizon_days: 3
+canvas_env: /Users/oakley/Projects/mcp/canvas-mcp/.env
+ed_env: /Users/oakley/Projects/mcp/ed-mcp/.env
+state_file: /Users/oakley/.local/state/usyd-due-reminders/last-run
+catch_up_hours: 20
+
+exclude_title_substrings:
+  - Drill
+  - Drills
+  - EFT Session
+
+courses:
+  - code: INFO1112
+    canvas_id: 73745
+    ed_id: 36385
+  - code: INFO1113
+    canvas_id: 73747
+    ed_id: 36387
+  - code: MATH1064
+    canvas_id: 74722
+    ed_id: 37261
+  - code: ELEC1601
+    canvas_id: 74259
+    ed_id: 39516
+
+# INFO1113 Challenge Tasks if the Ed challenges API is empty.
+# Times are Australia/Sydney.
+extra_tasks:
+  - course: INFO1113
+    title: "Week 1 Task (Challenge)"
+    due_at: "2026-08-16T10:00:00"
+  - course: INFO1113
+    title: "Week 2 Task (Challenge)"
+    due_at: "2026-08-24T10:00:00"
+  - course: INFO1113
+    title: "Week 3 Task (Challenge)"
+    due_at: "2026-08-31T10:00:00"

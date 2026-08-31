@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Privacy · Usyd Due{% endblock %}
+{% block content %}
+  <h1>Privacy &amp; tokens</h1>
+  <div class="card">
+    <p>Usyd Due is a personal project that helps you track assignment deadlines from Canvas and Ed via their official APIs.</p>
+    <h2 style="font-size:1.05rem">What we store</h2>
+    <ul>
+      <li>Your email (for magic-link sign-in and optional reminder emails).</li>
+      <li>Encrypted Canvas / Ed API tokens (Fernet) if you choose to connect them.</li>
+      <li>Course IDs you configure, optional manual extras, and a short-lived cache of upcoming dues.</li>
+    </ul>
+    <h2 style="font-size:1.05rem">What we do not do</h2>
+    <ul>
+      <li>We do not scrape login pages or store your LMS password.</li>
+      <li>We do not show your dues to other users.</li>
+      <li>We do not put API tokens in frontend JavaScript.</li>
+    </ul>
+    <h2 style="font-size:1.05rem">Revoking access</h2>
+    <ol>
+      <li>Delete the access token in Canvas (Account → Settings) and/or Ed API settings.</li>
+      <li>In Usyd Due Settings, clear the stored tokens.</li>
+    </ol>
+    <p class="muted">An API token has the same power as being logged in for the scopes it grants. Only paste tokens you created yourself.</p>
+  </div>
+  <p><a class="btn secondary" href="/">Back</a></p>
+{% endblock %}

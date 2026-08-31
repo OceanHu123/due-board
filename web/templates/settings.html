@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Settings · Usyd Due{% endblock %}
+{% block content %}
+  <h1>Settings</h1>
+  {% if is_demo %}
+    <p class="flash error">Demo account is read-only. Sign out and create your own account to save tokens.</p>
+  {% endif %}
+  {% if saved %}<p class="flash">Saved ({{ saved }}).</p>{% endif %}
+  {% if error == 'demo_readonly' %}
+    <p class="flash error">Demo account cannot be modified.</p>
+  {% elif error %}
+    <p class="flash error">{{ error }}</p>
+  {% endif %}
+
+  <section class="card">
+    <h2>Connect Canvas / Ed</h2>
+    <p class="muted">Tokens are encrypted server-side. They grant account-level API access — revoke anytime in Canvas / Ed.</p>
+    <ul class="muted">
+      <li>Canvas: {% if has_canvas %}connected{% else %}not connected{% endif %}</li>
+      <li>Ed: {% if has_ed %}connected{% else %}not connected{% endif %}</li>
+    </ul>
+    <form method="post" action="/settings/tokens">
+      <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
+        <label>Canvas API token (leave blank to keep)</label>
+        <input name="canvas_token" type="password" autocomplete="off" placeholder="Paste new token" />
+        <label>Canvas API URL</label>
+        <input name="canvas_api_url" value="{{ user.canvas_api_url }}" />
+        <label>Ed API token (leave blank to keep)</label>
+        <input name="ed_token" type="password" autocomplete="off" placeholder="Paste new token" />
+        <label>Ed API base URL</label>
+        <input name="ed_base_url" value="{{ user.ed_base_url }}" />
+        <div class="row">
+          <label><input type="checkbox" name="clear_canvas" value="1" /> Clear Canvas token</label>
+          <label><input type="checkbox" name="clear_ed" value="1" /> Clear Ed token</label>
+        </div>
+        <button class="btn" type="submit">Save connection</button>
+      </fieldset>
+    </form>
+    <p class="muted" style="margin-top:0.75rem">
+      Canvas: Account → Settings → New Access Token.<br />
+      Ed: <a href="https://edstem.org/au/settings/api-tokens" target="_blank" rel="noopener">edstem.org/au/settings/api-tokens</a>
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>Email reminders</h2>
+    <form method="post" action="/settings/reminders">
+      <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
+        <label><input type="checkbox" name="email_reminders" {% if user.email_reminders %}checked{% endif %} /> Enable email reminders</label>
+        <div class="row">
+          <div>
+            <label>Horizon (days)</label>
+            <input name="horizon_days" type="number" min="1" max="30" value="{{ user.horizon_days }}" />
+          </div>
+          <div>
+            <label>Morning hour (0–23)</label>
+            <input name="morning_hour" type="number" min="0" max="23" value="{{ user.morning_hour }}" />
+          </div>
+          <div>
+            <label>Evening hour</label>
+            <input name="evening_hour" type="number" min="0" max="23" value="{{ user.evening_hour }}" />
+          </div>
+        </div>
+        <label>Timezone</label>
+        <input name="timezone" value="{{ user.timezone }}" />
+        <button class="btn" type="submit">Save reminders</button>
+      </fieldset>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Courses</h2>
+    <table>
+      <tr><th>Code</th><th>Canvas ID</th><th>Ed ID</th><th></th></tr>
+      {% for c in courses %}
+      <tr>
+        <td>{{ c.code }}</td>
+        <td>{{ c.canvas_id or '—' }}</td>
+        <td>{{ c.ed_id or '—' }}</td>
+        <td>
+          {% if not is_demo %}
+          <form method="post" action="/settings/courses/{{ c.id }}/delete">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% if not is_demo %}
+    <form method="post" action="/settings/courses" style="margin-top:1rem">
+      <div class="row">
+        <div><label>Code</label><input name="code" placeholder="INFO1113" required /></div>
+        <div><label>Canvas ID</label><input name="canvas_id" placeholder="73747" /></div>
+        <div><label>Ed ID</label><input name="ed_id" placeholder="36387" /></div>
+      </div>
+      <button class="btn" type="submit">Add / update course</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Extra tasks</h2>
+    <table>
+      <tr><th>Course</th><th>Title</th><th>Due</th><th></th></tr>
+      {% for e in extras %}
+      <tr>
+        <td>{{ e.course }}</td>
+        <td>{{ e.title }}</td>
+        <td>{{ e.due_at }}</td>
+        <td>
+          {% if not is_demo %}
+          <form method="post" action="/settings/extras/{{ e.id }}/delete">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% if not is_demo %}
+    <form method="post" action="/settings/extras" style="margin-top:1rem">
+      <div class="row">
+        <div><label>Course</label><input name="course" value="INFO1113" required /></div>
+        <div><label>Title</label><input name="title" required /></div>
+      </div>
+      <label>Due (local ISO, e.g. 2026-08-31T10:00:00)</label>
+      <input name="due_at" placeholder="2026-08-31T10:00:00" required />
+      <label>URL (optional)</label>
+      <input name="url" />
+      <button class="btn" type="submit">Add extra task</button>
+    </form>
+    {% endif %}
+  </section>
+{% endblock %}

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Usyd Due{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #f4f1ea; --ink: #1c1917; --muted: #57534e; --card: #fffdf8;
+      --line: #e7e5e4; --accent: #0f766e; --today: #b45309; --danger: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+      font-family: "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #dce9e6 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #f3e7d5 0%, transparent 50%),
+        var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    header.top {
+      display: flex; justify-content: space-between; align-items: center;
+      max-width: 820px; margin: 0 auto; padding: 1.25rem 1.25rem 0; width: 100%;
+    }
+    header.top a { color: var(--accent); text-decoration: none; font-weight: 600; margin-left: 1rem; }
+    main { max-width: 820px; margin: 0 auto; padding: 1rem 1.25rem 2rem; width: 100%; flex: 1; }
+    footer.site {
+      max-width: 820px; margin: 0 auto; padding: 0 1.25rem 2rem; width: 100%;
+      color: var(--muted); font-size: 0.85rem;
+    }
+    footer.site a { color: var(--accent); }
+    h1 { font-size: 1.7rem; margin: 0.4rem 0; letter-spacing: -0.02em; }
+    .muted { color: var(--muted); }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 1rem 1.1rem; margin: 0.75rem 0;
+    }
+    .card.today { border-color: #fdba74; box-shadow: inset 3px 0 0 var(--today); }
+    .btn {
+      display: inline-block; background: var(--accent); color: #fff; border: 0;
+      border-radius: 8px; padding: 0.5rem 0.9rem; font-weight: 600; cursor: pointer;
+      text-decoration: none; font-size: 0.92rem;
+    }
+    .btn.secondary { background: #44403c; }
+    .btn.danger { background: var(--danger); }
+    .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    input, select {
+      width: 100%; padding: 0.55rem 0.65rem; border: 1px solid var(--line);
+      border-radius: 8px; font-size: 1rem; margin: 0.35rem 0 0.75rem; background: #fff;
+    }
+    label { font-size: 0.88rem; font-weight: 600; }
+    .flash { padding: 0.75rem 1rem; border-radius: 10px; background: #ecfdf5; color: var(--accent); }
+    .error { background: #fef2f2; color: var(--danger); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    td, th { text-align: left; padding: 0.4rem 0.3rem; border-bottom: 1px solid var(--line); }
+    .row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 140px; }
+    .cta { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1.25rem 0; }
+    .steps { padding-left: 1.2rem; }
+    .steps li { margin: 0.4rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <strong><a href="/" style="margin:0;color:inherit">{{ settings.app_name }}</a></strong>
+    <nav>
+      {% if user %}
+        <a href="/">看板</a>
+        <a href="/refresh">刷新</a>
+        <a href="/settings">设置</a>
+        <form action="/logout" method="post" style="display:inline">
+          <button class="btn secondary" type="submit" style="margin-left:1rem">Sign out</button>
+        </form>
+      {% else %}
+        <a href="/login">Sign in</a>
+        <a href="/privacy">Privacy</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site">
+    <a href="/privacy">Privacy</a>
+    {% if settings.github_url %} · <a href="{{ settings.github_url }}" target="_blank" rel="noopener">GitHub</a>{% endif %}
+    · Tokens stay on the server (encrypted). Not affiliated with the University of Sydney.
+  </footer>
+</body>
+</html>

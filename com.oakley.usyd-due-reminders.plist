@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.oakley.usyd-due-reminders</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/oakley/Projects/usyd-due-reminders</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/oakley/.local/bin/uv</string>
+    <string>run</string>
+    <string>--project</string>
+    <string>/Users/oakley/Projects/usyd-due-reminders</string>
+    <string>python</string>
+    <string>/Users/oakley/Projects/usyd-due-reminders/remind.py</string>
+    <string>--mode</string>
+    <string>auto</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Hour</key>
+      <integer>8</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+    <dict>
+      <key>Hour</key>
+      <integer>18</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/oakley/.local/state/usyd-due-reminders/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/oakley/.local/state/usyd-due-reminders/launchd.err.log</string>
+</dict>
+</plist>

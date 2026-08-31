@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Usyd Due — Canvas + Ed deadline board{% endblock %}
+{% block content %}
+  <h1>{{ settings.app_name }}</h1>
+  <p style="font-size:1.15rem;max-width:36rem">
+    One board for your University of Sydney Canvas and Ed deadlines — with morning and evening email digests in <code>Australia/Sydney</code> time.
+  </p>
+
+  <div class="cta">
+    <form method="post" action="/demo"><button class="btn" type="submit">Try demo</button></form>
+    <a class="btn ghost" href="/login">Sign in with email</a>
+  </div>
+
+  <section class="card">
+    <h2 style="margin-top:0;font-size:1.1rem">How it works</h2>
+    <ol class="steps">
+      <li>Sign in with a magic link (no password).</li>
+      <li>Paste <strong>your own</strong> Canvas and Ed API tokens — stored encrypted on the server.</li>
+      <li>Open the board anytime, or get email reminders at 08:00 / 18:00 (configurable).</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0;font-size:1.1rem">Security</h2>
+    <ul class="steps">
+      <li>Tokens never ship to the browser after save; only ciphertext is stored.</li>
+      <li>Each account only sees its own dues.</li>
+      <li>Revoke tokens anytime in Canvas / Ed settings, and clear them here.</li>
+    </ul>
+    <p class="muted" style="margin-bottom:0">Demo uses fictional deadlines — no real LMS credentials.</p>
+  </section>
+{% endblock %}

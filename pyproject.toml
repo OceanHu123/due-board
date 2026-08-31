@@ -1,0 +1,41 @@
+[project]
+name = "usyd-due-reminders"
+version = "0.2.0"
+description = "Usyd Canvas + Ed due board and email reminders (multi-user web + optional local macOS tools)"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.27",
+  "pyyaml>=6.0",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "jinja2>=3.1",
+  "python-multipart>=0.0.9",
+  "sqlalchemy>=2.0",
+  "cryptography>=43.0",
+  "pydantic-settings>=2.4",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2"]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+usyd-due = "remind:main"
+usyd-due-web = "web.app:run"
+usyd-due-worker = "web.worker:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dues_lib", "web"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"web/templates" = "web/templates"
+"remind.py" = "remind.py"
+"config.yaml" = "config.yaml"

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.last-run
+state.json
+.DS_Store
+uv.lock
+data/
+.tmp_*/
+.tmp_math/
+.tmp_info1112/

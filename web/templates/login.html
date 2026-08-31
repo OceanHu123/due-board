@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Sign in · Usyd Due{% endblock %}
+{% block content %}
+  <h1>Sign in</h1>
+  <p class="muted">We’ll email a magic link. In local dev without mail configured, the link appears on this page and in the server console.</p>
+
+  {% if error %}<p class="flash error">{{ error }}</p>{% endif %}
+  {% if sent %}
+    <p class="flash">Link sent to <strong>{{ sent }}</strong>.</p>
+    {% if dev_link %}
+      <p class="card">Dev shortcut: <a href="{{ dev_link }}">{{ dev_link }}</a></p>
+    {% endif %}
+  {% endif %}
+
+  <form class="card" method="post" action="/login">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required placeholder="you@uni.sydney.edu.au" />
+    <button class="btn" type="submit">Send magic link</button>
+  </form>
+  <p class="muted">Or <form method="post" action="/demo" style="display:inline"><button class="btn ghost" type="submit">Try demo</button></form> without an email.</p>
+{% endblock %}
