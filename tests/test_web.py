@@ -41,7 +41,8 @@ def test_landing_and_health(client: TestClient):
 def test_demo_login_seeds_dues(client: TestClient):
     r = client.post("/demo", follow_redirects=True)
     assert r.status_code == 200
-    assert "Demo mode" in r.text
+    # Board copy is bilingual-friendly; accept either phrasing.
+    assert "Demo mode" in r.text or "演示" in r.text
     assert "INFO1113" in r.text
     db = SessionLocal()
     try:
