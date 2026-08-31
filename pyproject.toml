@@ -35,7 +35,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["dues_lib", "web"]
 
+# Hatch already packs non-.py files under packages/; only force-include root modules.
 [tool.hatch.build.targets.wheel.force-include]
-"web/templates" = "web/templates"
 "remind.py" = "remind.py"
 "config.yaml" = "config.yaml"
