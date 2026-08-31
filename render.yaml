@@ -1,6 +1,7 @@
-# Render Blueprint — https://render.com/docs/blueprint-spec
-# No custom domain required: use https://<service>.onrender.com
-# See docs/DEPLOY_RENDER.md for the full checklist (Chinese).
+# Render Blueprint — free tier: Web + Postgres only (no Worker).
+# Workers are not available on the free plan.
+# No custom domain required: https://<service>.onrender.com
+# See docs/DEPLOY_RENDER.md
 
 services:
   - type: web
@@ -19,7 +20,6 @@ services:
         fromDatabase:
           name: usyd-due-db
           property: connectionString
-      # Board-first: false = site works without Resend. Set true only if sending mail.
       - key: REQUIRE_MAIL
         value: "false"
       - key: RESEND_API_KEY
@@ -27,33 +27,7 @@ services:
       - key: SMTP_FROM
         sync: false
       - key: GITHUB_URL
-        sync: false
-
-  - type: worker
-    name: usyd-due-worker
-    runtime: docker
-    dockerCommand: usyd-due-worker --loop --interval 900
-    plan: free
-    envVars:
-      - key: BASE_URL
-        sync: false
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: usyd-due-web
-          envVarKey: SECRET_KEY
-      - key: TOKEN_FERNET_KEY
-        sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: usyd-due-db
-          property: connectionString
-      - key: REQUIRE_MAIL
-        value: "false"
-      - key: RESEND_API_KEY
-        sync: false
-      - key: SMTP_FROM
-        sync: false
+        value: https://github.com/OceanHu123/usyd-due-reminders
 
 databases:
   - name: usyd-due-db

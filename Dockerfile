@@ -5,7 +5,9 @@ COPY pyproject.toml README.md ./
 COPY dues_lib ./dues_lib
 COPY web ./web
 COPY remind.py config.yaml ./
-RUN uv pip install --system ".[postgres]"
+# Ensure hatchling can build the wheel inside the image.
+RUN uv pip install --system --no-cache ".[postgres]"
 ENV PORT=8000
 EXPOSE 8000
+# Render sets PORT; bind all interfaces for health checks.
 CMD ["usyd-due-web"]

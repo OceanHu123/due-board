@@ -11,9 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 def normalize_database_url(url: str) -> str:
     """Render/Heroku often give postgres://; SQLAlchemy + psycopg need postgresql+psycopg://."""
     if url.startswith("postgres://"):
-        return "postgresql+psycopg://" + url.removeprefix("postgres://")
-    if url.startswith("postgresql://") and "+psycopg" not in url:
-        return "postgresql+psycopg://" + url.removeprefix("postgresql://")
+        url = "postgresql+psycopg://" + url.removeprefix("postgres://")
+    elif url.startswith("postgresql://") and "+psycopg" not in url:
+        url = "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    # Render managed Postgres requires TLS.
+    if ("render.com" in url or "dpg-" in url) and "sslmode=" not in url:
+        url = url + ("&" if "?" in url else "?") + "sslmode=require"
     return url
 
 

@@ -40,7 +40,8 @@ git push -u origin main
 ## 2. 本地生成 Fernet 密钥（复制保存）
 
 ```sh
-python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+cd ~/Projects/usyd-due-reminders
+uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
 ```
 
 把输出整行复制好，等下填到 Render 的 `TOKEN_FERNET_KEY`。
@@ -49,36 +50,59 @@ python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().
 
 ## 3. 用 Blueprint 一键创建服务
 
-1. 打开 [https://dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**  
-2. 连接 GitHub，选中 `usyd-due-reminders` 仓库  
-3. Render 会读仓库根目录的 [`render.yaml`](../render.yaml)，通常会创建：  
-   - **Web**：`usyd-due-web`（网站）  
-   - **Worker**：`usyd-due-worker`（定时同步；邮件可选）  
-   - **Postgres**：`usyd-due-db`  
-4. 在提示填环境变量的地方填（见下一节）→ **Apply**  
+> **免费套餐注意：** Render Free **没有 Background Worker**。仓库里的 `render.yaml` 现在只创建 **Web + Postgres**。定时邮件可先用本机；看板靠网页上点「刷新」。
 
-部署完成后，Web 服务页面会显示一个地址，例如：
+1. 打开 [https://dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**
+2. 连接 GitHub，选中 `usyd-due-reminders` 仓库
+3. Render 会读 [`render.yaml`](../render.yaml)，创建：
+   - **Web**：`usyd-due-web`
+   - **Postgres**：`usyd-due-db`
+4. 填环境变量（见下一节）→ **Apply**
+
+若你之前 Blueprint 已失败过：在 Blueprint 页点 **Manual sync**（或删掉失败的 Web 服务后重新 Apply），确保拉到最新 `render.yaml`（已去掉 Worker）。
+
+部署完成后，Web 服务页面会显示例如：
 
 `https://usyd-due-web-xxxx.onrender.com`
 
-**把这个地址收藏到浏览器**——这就是你的「随时可开」网站。
+**收藏这个地址。**
+
+### Web 仍 Failed deploy 时
+
+打开 **usyd-due-web → Logs**，常见原因：
+
+| 日志线索 | 处理 |
+|----------|------|
+| database / SSL / connection | 已在代码里为 Render 自动加 `sslmode=require`；拉最新代码再 deploy |
+| health check failed | 等冷启动完成；确认 `healthCheckPath` 为 `/healthz` |
+| TOKEN_FERNET_KEY / SECRET_KEY | 在 Environment 里补上后 **Clear build cache & deploy** |
+
+只要看板：**不必**开 Worker，也不必买域名。
 
 ---
 
 ## 4. 环境变量怎么填
 
-在 Web（以及 Worker，若 Blueprint 要求各填一遍）里：
+在 **usyd-due-web** 的 Environment 里：
 
-| 变量 | 填什么 | 必填？ |
-|------|--------|--------|
-| `BASE_URL` | 你的站点完整地址，如 `https://usyd-due-web-xxxx.onrender.com`（**不要**末尾 `/`） | 是 |
-| `SECRET_KEY` | Blueprint 可自动生成；或自己一长串随机字符 | 是 |
-| `TOKEN_FERNET_KEY` | 第 2 步生成的 Fernet 密钥 | 是 |
-| `DATABASE_URL` | Blueprint 从 Postgres 自动挂上即可 | 是（自动） |
-| `REQUIRE_MAIL` | 只要看板：填 `false`；要云端邮件：填 `true` | 建议先 `false` |
-| `RESEND_API_KEY` | 仅在要发邮件时填 | 否 |
-| `SMTP_FROM` | 仅发邮件时：测试可用 `Usyd Due <onboarding@resend.dev>` | 否 |
-| `GITHUB_URL` | 你的 GitHub 仓库链接（页脚用） | 否 |
+
+| 变量                 | 填什么                                                               | 必填？         |
+| ------------------ | ----------------------------------------------------------------- | ----------- |
+| `BASE_URL`         | 你的站点完整地址，如 `https://usyd-due-web-xxxx.onrender.com`（**不要**末尾 `/`） | 是           |
+| `SECRET_KEY`       | Blueprint 可自动生成；或自己一长串随机字符                                        | 是           |
+| `TOKEN_FERNET_KEY` | 第 2 步生成的 Fernet 密钥                                                | 是           |
+| `DATABASE_URL`     | Blueprint 从 Postgres 自动挂上即可                                       | 是（自动）       |
+| `REQUIRE_MAIL`     | 只要看板：填 `false`                                                     | 建议 `false`  |
+| `RESEND_API_KEY`   | 仅在要发邮件时填                                                          | 否           |
+| `SMTP_FROM`        | 仅发邮件时填                                                            | 否           |
+| `GITHUB_URL`       | 你的 GitHub 仓库链接（页脚用）                                               | 否           |
+
+填完 `BASE_URL` 后若服务已在跑，点 **Manual Deploy → Clear build cache & deploy** 一次更稳妥。
+
+登录 magic link：未配邮件时，链接会显示在登录页；配了 Resend 则发到邮箱（测试域名通常只能发到你注册 Resend 的邮箱）。
+| `SMTP_FROM`        | 仅发邮件时：测试可用 `Usyd Due <onboarding@resend.dev>`                     | 否           |
+| `GITHUB_URL`       | 你的 GitHub 仓库链接（页脚用）                                               | 否           |
+
 
 填完 `BASE_URL` 后若服务已在跑，点 **Manual Deploy → Clear build cache & deploy** 一次更稳妥。
 
@@ -88,11 +112,11 @@ python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().
 
 ## 5. 部署后自测清单
 
-1. 浏览器打开 `https://…onrender.com` → 能看到 Landing  
-2. **Try demo** → 能进看板  
-3. 用自己的邮箱登录 → 设置里粘贴 Canvas / Ed token → **刷新未完成 due**  
-4. 手机流量下再打开同一网址（确认不是只有你家 Wi‑Fi 能开）  
-5. 电脑关机，用手机再开一次收藏夹  
+1. 浏览器打开 `https://…onrender.com` → 能看到 Landing
+2. **Try demo** → 能进看板
+3. 用自己的邮箱登录 → 设置里粘贴 Canvas / Ed token → **刷新未完成 due**
+4. 手机流量下再打开同一网址（确认不是只有你家 Wi‑Fi 能开）
+5. 电脑关机，用手机再开一次收藏夹
 
 ---
 
@@ -107,11 +131,13 @@ python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().
 
 ## 7. 和本机工具怎么分工
 
-| | 本机 `remind.py` + launchd | Render 网站 |
-|--|---------------------------|-------------|
-| 电脑关机 | 到点可能没通知 | 看板仍可打开 |
-| 横幅通知 | 有 | 无（除非以后再开邮件） |
-| 收藏网址 | `127.0.0.1` 仅本机服务开着时可用 | `*.onrender.com` 随时可用 |
+
+|      | 本机 `remind.py` + launchd | Render 网站             |
+| ---- | ------------------------ | --------------------- |
+| 电脑关机 | 到点可能没通知                  | 看板仍可打开                |
+| 横幅通知 | 有                        | 无（除非以后再开邮件）           |
+| 收藏网址 | `127.0.0.1` 仅本机服务开着时可用   | `*.onrender.com` 随时可用 |
+
 
 ---
 
@@ -136,8 +162,8 @@ A: 存在云端数据库里（Fernet 加密）。只用你自己的 Render 账�
 
 ## 9. 部署成功后记得做
 
-1. 把 Live URL 写进简历 / README 顶部  
-2. 浏览器收藏该 URL  
-3. （可选）把本机 launchd 留作「开机横幅」备份  
+1. 把 Live URL 写进简历 / README 顶部
+2. 浏览器收藏该 URL
+3. （可选）把本机 launchd 留作「开机横幅」备份
 
 若某一步报错，把 Render 的 **Deploy logs** 最后 30 行复制出来即可继续排查。

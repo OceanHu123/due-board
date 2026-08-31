@@ -22,3 +22,6 @@ def test_normalize_database_url():
     assert normalize_database_url("postgres://u:p@h/db").startswith("postgresql+psycopg://")
     assert normalize_database_url("postgresql://u:p@h/db").startswith("postgresql+psycopg://")
     assert normalize_database_url("sqlite:///./x.db") == "sqlite:///./x.db"
+    render = normalize_database_url("postgresql://u:p@dpg-abc/db")
+    assert "sslmode=require" in render
+    assert "+psycopg" in render
