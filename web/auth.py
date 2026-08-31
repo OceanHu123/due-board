@@ -12,7 +12,7 @@ from web.db import MagicLink, Session as DbSession, User
 from web.mailer import send_email
 from web.sync import ensure_default_courses
 
-COOKIE = "usyd_due_session"
+COOKIE = "due_board_session"
 
 
 def _hash(token: str) -> str:

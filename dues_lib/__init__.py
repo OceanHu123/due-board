@@ -1,4 +1,9 @@
-"""Shared Canvas + Ed due fetching and filtering."""
+"""Shared Canvas + Ed due fetching and filtering.
+
+Multi-institution compatible: CanvasCreds / EdCreds carry per-institution URLs
+(defaults are intentionally left blank so callers can pass institution-specific
+values, usually from web.config.institution_by_code).
+"""
 
 from __future__ import annotations
 
@@ -11,12 +16,32 @@ import httpx
 
 DEFAULT_EXCLUDE = ("Drill", "Drills", "EFT Session")
 
-DEFAULT_COURSES: list[dict[str, Any]] = [
+# NOTE: Legacy default courses preserved for backwards compatibility. Prefer
+# `web.config.default_courses_for(code)` when you know the institution, which
+# reads from institutions.yaml and per-institution default courses.
+_DEFAULT_COURSES_LEGACY: list[dict[str, Any]] = [
     {"code": "INFO1112", "canvas_id": 73745, "ed_id": 36385},
     {"code": "INFO1113", "canvas_id": 73747, "ed_id": 36387},
     {"code": "MATH1064", "canvas_id": 74722, "ed_id": 37261},
     {"code": "ELEC1601", "canvas_id": 74259, "ed_id": 39516},
 ]
+
+
+def default_courses(institution_code: str = "usyd") -> list[dict[str, Any]]:
+    """Return default courses for an institution.
+
+    If the institution registry (web.config) is available, that is the source of
+    truth. Otherwise fall back to the legacy list (so dues_lib still works as a
+    standalone library outside the web app, e.g. in remind.py).
+    """
+    try:
+        from web.config import default_courses_for  # noqa: WPS433
+
+        return default_courses_for(institution_code)
+    except Exception:  # noqa: BLE001 — web.config missing means standalone usage
+        if institution_code == "usyd":
+            return list(_DEFAULT_COURSES_LEGACY)
+        return []
 
 
 @dataclass(frozen=True)
@@ -62,13 +87,16 @@ class DueItem:
 @dataclass(frozen=True)
 class CanvasCreds:
     token: str
-    api_url: str = "https://canvas.sydney.edu.au/api/v1"
+    # Intentionally no hardcoded default — callers pass the institution URL or a
+    # user override. Passing an empty string triggers an explicit ValueError.
+    api_url: str = ""
 
 
 @dataclass(frozen=True)
 class EdCreds:
     token: str
-    base_url: str = "https://edstem.org/api"
+    # Intentionally no hardcoded default.
+    base_url: str = ""
 
 
 def parse_dt(value: str | None, tz: ZoneInfo) -> datetime | None:

@@ -1,0 +1,73 @@
+# Multi-institution support for DueBoard.
+# The user picks one on sign-up; all URLs and default courses are scoped to it.
+#
+# Add new institutions here. They appear in the settings dropdown automatically.
+# Fields:
+#   code:   short stable ID (used in DB user.institution_code)
+#   name:   display name (shows in the dropdown and landing page)
+#   canvas_url: Canvas LMS base API URL (without trailing slash)
+#   ed_region:  Ed Discussion API region (e.g. 'au', 'us', 'uk', 'nz')
+#   ed_base_url: Ed API base URL (usually the same for every region)
+#   default_courses: list of {code, canvas_id?, ed_id?} seed courses for new users
+
+institutions:
+  - code: usyd
+    name: University of Sydney
+    canvas_url: https://canvas.sydney.edu.au/api/v1
+    ed_region: au
+    ed_base_url: https://edstem.org/api
+    default_courses:
+      - code: INFO1112
+        canvas_id: 73745
+        ed_id: 36385
+      - code: INFO1113
+        canvas_id: 73747
+        ed_id: 36387
+      - code: MATH1064
+        canvas_id: 74722
+        ed_id: 37261
+      - code: ELEC1601
+        canvas_id: 74259
+        ed_id: 39516
+
+  - code: unsw
+    name: UNSW Sydney
+    canvas_url: https://canvas.unsw.edu.au/api/v1
+    ed_region: au
+    ed_base_url: https://edstem.org/api
+    default_courses: []
+
+  - code: unimelb
+    name: University of Melbourne
+    canvas_url: https://canvas.lms.unimelb.edu.au/api/v1
+    ed_region: au
+    ed_base_url: https://edstem.org/api
+    default_courses: []
+
+  - code: monash
+    name: Monash University
+    canvas_url: https://lms.monash.edu/api/v1
+    ed_region: au
+    ed_base_url: https://edstem.org/api
+    default_courses: []
+
+  - code: anu
+    name: Australian National University
+    canvas_url: https://wattlecourses.anu.edu.au/api/v1
+    ed_region: au
+    ed_base_url: https://edstem.org/api
+    default_courses: []
+
+  - code: uq
+    name: University of Queensland
+    canvas_url: https://learn.uq.edu.au/api/v1
+    ed_region: au
+    ed_base_url: https://edstem.org/api
+    default_courses: []
+
+  - code: custom
+    name: Custom (blank)
+    canvas_url: ""        # user fills in Settings
+    ed_region: au
+    ed_base_url: https://edstem.org/api
+    default_courses: []

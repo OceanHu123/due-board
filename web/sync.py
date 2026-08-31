@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from dues_lib import (
-    DEFAULT_COURSES,
     DEFAULT_EXCLUDE,
     CanvasCreds,
     CourseRef,
@@ -14,14 +13,24 @@ from dues_lib import (
     collect_dues,
     window_filter,
 )
+from web.config import (
+    default_canvas_url_for,
+    default_courses_for,
+    default_ed_base_url_for,
+)
 from web.crypto import decrypt_secret
 from web.db import DueCache, ExtraTask, User, UserCourse
 
 
 def ensure_default_courses(db: Session, user: User) -> None:
+    """Seed the user's course list from their institution's defaults.
+
+    Only runs when the user has **zero** configured courses — users who
+    manually edited their courses won't see repeated seeds.
+    """
     if user.courses:
         return
-    for row in DEFAULT_COURSES:
+    for row in default_courses_for(user.institution_code):
         db.add(
             UserCourse(
                 user_id=user.id,
@@ -32,6 +41,19 @@ def ensure_default_courses(db: Session, user: User) -> None:
         )
     db.commit()
     db.refresh(user)
+
+
+def _resolved_canvas_url(user: User) -> str:
+    """Institution default, overridden by explicit per-user canvas_api_url if set."""
+    if user.canvas_api_url and user.canvas_api_url.strip():
+        return user.canvas_api_url.strip().rstrip("/")
+    return default_canvas_url_for(user.institution_code)
+
+
+def _resolved_ed_base_url(user: User) -> str:
+    if user.ed_base_url and user.ed_base_url.strip():
+        return user.ed_base_url.strip().rstrip("/")
+    return default_ed_base_url_for(user.institution_code)
 
 
 def sync_user_dues(db: Session, user: User) -> list[DueCache]:
@@ -55,13 +77,12 @@ def sync_user_dues(db: Session, user: User) -> list[DueCache]:
         if user.canvas_token_enc:
             canvas = CanvasCreds(
                 token=decrypt_secret(user.canvas_token_enc),
-                api_url=user.canvas_api_url
-                or "https://canvas.sydney.edu.au/api/v1",
+                api_url=_resolved_canvas_url(user),
             )
         if user.ed_token_enc:
             ed = EdCreds(
                 token=decrypt_secret(user.ed_token_enc),
-                base_url=user.ed_base_url or "https://edstem.org/api",
+                base_url=_resolved_ed_base_url(user),
             )
         items = collect_dues(
             canvas=canvas,

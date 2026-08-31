@@ -5,13 +5,19 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+import web.db as _db
 from web.config import get_settings
-from web.db import DueCache, SessionLocal, User, init_db, reconfigure_db
+from web.db import DueCache, User, init_db, reconfigure_db
 from web.demo import ensure_demo_user, is_demo_user
+
+
+def SessionLocal():  # noqa: N802 — alias to always pick up the latest reconfigured engine
+    return _db.SessionLocal()
 
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
+    import importlib, sys
     db_file = tmp_path / "test.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
     monkeypatch.setenv("SECRET_KEY", "test-secret-for-ci")
@@ -22,8 +28,15 @@ def client(tmp_path, monkeypatch):
     get_settings.cache_clear()
     reconfigure_db()
     init_db()
-    from web.app import app
-
+    # Re-import the FastAPI app fresh each test so startup hooks bind to the new engine.
+    for mod in list(sys.modules.keys()):
+        if mod == "web.app" or mod.startswith("web.app."):
+            del sys.modules[mod]
+    from web.app import app  # noqa: WPS433
+    # Re-create tables on the current engine AFTER app is imported so startup handlers
+    # run against the right database. (FastAPI startup does create_all, but do it here
+    # explicitly so tables exist even before the context manager enter.)
+    init_db()
     with TestClient(app) as c:
         yield c
     get_settings.cache_clear()

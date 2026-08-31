@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.oakley.due-board</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-lc</string>
+        <string>cd "$HOME/Projects/usyd-due-reminders" && uv run due-board 2>&1 | tee -a "$HOME/.local/state/due-board/launchd.log"</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/oakley/Projects/usyd-due-reminders</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <!-- Twice hourly, at x:07 and x:37 — catches morning (08:00) and evening (18:00) send windows. -->
+        <key>Minute</key>
+        <integer>7</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/oakley/.local/state/due-board/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/oakley/.local/state/due-board/launchd.err.log</string>
+</dict>
+</plist>

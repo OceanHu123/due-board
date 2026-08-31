@@ -1,7 +1,7 @@
 [project]
-name = "usyd-due-reminders"
-version = "0.2.0"
-description = "Usyd Canvas + Ed due board and email reminders (multi-user web + optional local macOS tools)"
+name = "due-board"
+version = "0.3.0"
+description = "Multi-institution LMS deadline board (Canvas + Ed) with encrypted tokens and email digests. Formerly usyd-due-reminders."
 requires-python = ">=3.12"
 dependencies = [
   "httpx>=0.27",
@@ -20,9 +20,9 @@ postgres = ["psycopg[binary]>=3.2"]
 dev = ["pytest>=8.0", "httpx>=0.27"]
 
 [project.scripts]
-usyd-due = "remind:main"
-usyd-due-web = "web.app:run"
-usyd-due-worker = "web.worker:main"
+due-board = "remind:main"
+due-board-web = "web.app:run"
+due-board-worker = "web.worker:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

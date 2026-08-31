@@ -12,7 +12,7 @@ from web.db import DueCache, SessionLocal, User, init_db
 from web.mailer import send_email
 from web.sync import sync_user_dues
 
-log = logging.getLogger("usyd_due.worker")
+log = logging.getLogger("due_board.worker")
 
 
 def _rows_to_items(rows: list[DueCache]) -> list[DueItem]:
@@ -145,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     import time
 
     logging.basicConfig(level=logging.INFO)
-    parser = argparse.ArgumentParser(description="Usyd Due email worker")
+    parser = argparse.ArgumentParser(description="DueBoard email worker")
     parser.add_argument("--force", choices=("morning", "evening"), default=None)
     parser.add_argument("--email", default=None, help="Only this account email (whose dues to sync)")
     parser.add_argument(

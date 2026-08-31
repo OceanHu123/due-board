@@ -1,4 +1,4 @@
-# Resume blurbs — Usyd Due
+# Resume blurbs — DueBoard (formerly Usyd Due)
 
 ## English (pick 3–4)
 

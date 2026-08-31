@@ -10,4 +10,4 @@ RUN uv pip install --system --no-cache ".[postgres]"
 ENV PORT=8000
 EXPOSE 8000
 # Render sets PORT; bind all interfaces for health checks.
-CMD ["usyd-due-web"]
+CMD ["due-board-web"]

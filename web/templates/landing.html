@@ -1,20 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Usyd Due — Canvas + Ed deadline board{% endblock %}
+{% block title %}DueBoard — Canvas + Ed deadline board{% endblock %}
 {% block content %}
   <h1>{{ settings.app_name }}</h1>
   <p style="font-size:1.15rem;max-width:36rem">
-    One board for your University of Sydney Canvas and Ed deadlines — with morning and evening email digests in <code>Australia/Sydney</code> time.
+    One board for all your Canvas and Ed deadlines — university-agnostic.
+    Includes morning and evening email digests, with <code>Australia/Sydney</code> as the default timezone.
   </p>
-
   <div class="cta">
     <form method="post" action="/demo"><button class="btn" type="submit">Try demo</button></form>
     <a class="btn ghost" href="/login">Sign in with email</a>
   </div>
 
   <section class="card">
+    <h2 style="margin-top:0;font-size:1.1rem">Supported institutions</h2>
+    <p class="muted">Defaults are built in for the schools below — pick your school in Settings and
+      the correct Canvas/Ed API URLs are already filled. Schools not listed use the <em>Custom</em> preset.</p>
+    <ul class="steps">
+      <li>🇦🇺 University of Sydney (USYD)</li>
+      <li>🇦🇺 UNSW Sydney</li>
+      <li>🇦🇺 University of Melbourne</li>
+      <li>🇦🇺 Monash University</li>
+      <li>🇦🇺 Australian National University (ANU)</li>
+      <li>🇦🇺 University of Queensland (UQ)</li>
+      <li>✨ Custom (any Canvas URL you configure)</li>
+    </ul>
+  </section>
+
+  <section class="card">
     <h2 style="margin-top:0;font-size:1.1rem">How it works</h2>
     <ol class="steps">
       <li>Sign in with a magic link (no password).</li>
+      <li>Pick your institution — default Canvas/Ed URLs are seeded for you.</li>
       <li>Paste <strong>your own</strong> Canvas and Ed API tokens — stored encrypted on the server.</li>
       <li>Open the board anytime, or get email reminders at 08:00 / 18:00 (configurable).</li>
     </ol>

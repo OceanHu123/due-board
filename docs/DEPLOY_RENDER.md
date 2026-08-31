@@ -1,7 +1,9 @@
-# Deploy Usyd Due on Render（不用买域名）
+# Deploy DueBoard on Render（不用买域名）
 
-目标：得到一个类似 `https://usyd-due-web.onrender.com` 的网址，**收藏后随时打开**（电脑关机也能进）。  
+目标：得到一个类似 `https://due-board.onrender.com` 的网址，**收藏后随时打开**（电脑关机也能进）。  
 **不需要购买自定义域名**——和 GitHub Pages 的 `*.github.io` 一样，用平台送的子域名即可。
+
+> 原项目名：**Usyd Due**。如果你部署的是旧版本，文档中的路径/名称可替换为 `usyd-due-web` 等旧值。
 
 ---
 
@@ -21,15 +23,15 @@
 在项目目录：
 
 ```sh
-cd ~/Projects/usyd-due-reminders
+cd ~/Projects/due-board
 
 # 若还没有 git 远程：在 GitHub 网页 New repository（不要勾选自动加 README），然后：
 git init   # 若已是 git 仓库可跳过
 git add .
 git status   # 确认没有把 .env 加进去
-git commit -m "Add Usyd Due web platform for Render deploy"
+git commit -m "Add DueBoard web platform for Render deploy"
 git branch -M main
-git remote add origin https://github.com/OceanHu123/usyd-due-reminders.git
+git remote add origin https://github.com/OceanHu123/due-board.git
 git push -u origin main
 ```
 
@@ -40,7 +42,7 @@ git push -u origin main
 ## 2. 本地生成 Fernet 密钥（复制保存）
 
 ```sh
-cd ~/Projects/usyd-due-reminders
+cd ~/Projects/due-board
 uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
 ```
 
@@ -53,23 +55,23 @@ uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_
 > **免费套餐注意：** Render Free **没有 Background Worker**。仓库里的 `render.yaml` 现在只创建 **Web + Postgres**。定时邮件可先用本机；看板靠网页上点「刷新」。
 
 1. 打开 [https://dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**
-2. 连接 GitHub，选中 `usyd-due-reminders` 仓库
+2. 连接 GitHub，选中 `due-board` 仓库
 3. Render 会读 [`render.yaml`](../render.yaml)，创建：
-   - **Web**：`usyd-due-web`
-   - **Postgres**：`usyd-due-db`
+   - **Web**：`due-board`
+   - **Postgres**：`due-board-db`
 4. 填环境变量（见下一节）→ **Apply**
 
 若你之前 Blueprint 已失败过：在 Blueprint 页点 **Manual sync**（或删掉失败的 Web 服务后重新 Apply），确保拉到最新 `render.yaml`（已去掉 Worker）。
 
 部署完成后，Web 服务页面会显示例如：
 
-`https://usyd-due-web-xxxx.onrender.com`
+`https://due-board-xxxx.onrender.com`
 
 **收藏这个地址。**
 
 ### Web 仍 Failed deploy 时
 
-打开 **usyd-due-web → Logs**，常见原因：
+打开 **due-board → Logs**，常见原因：
 
 | 日志线索 | 处理 |
 |----------|------|
@@ -83,26 +85,23 @@ uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_
 
 ## 4. 环境变量怎么填
 
-在 **usyd-due-web** 的 Environment 里：
+在 **due-board** 的 Environment 里：
 
 
 | 变量                 | 填什么                                                               | 必填？         |
 | ------------------ | ----------------------------------------------------------------- | ----------- |
-| `BASE_URL`         | 你的站点完整地址，如 `https://usyd-due-web-xxxx.onrender.com`（**不要**末尾 `/`） | 是           |
+| `BASE_URL`         | 你的站点完整地址，如 `https://due-board-xxxx.onrender.com`（**不要**末尾 `/`） | 是           |
 | `SECRET_KEY`       | Blueprint 可自动生成；或自己一长串随机字符                                        | 是           |
 | `TOKEN_FERNET_KEY` | 第 2 步生成的 Fernet 密钥                                                | 是           |
 | `DATABASE_URL`     | Blueprint 从 Postgres 自动挂上即可                                       | 是（自动）       |
 | `REQUIRE_MAIL`     | 只要看板：填 `false`                                                     | 建议 `false`  |
 | `RESEND_API_KEY`   | 仅在要发邮件时填                                                          | 否           |
-| `SMTP_FROM`        | 仅发邮件时填                                                            | 否           |
+| `SMTP_FROM`        | 仅发邮件时填（如 `DueBoard <onboarding@resend.dev>`）                           | 否           |
 | `GITHUB_URL`       | 你的 GitHub 仓库链接（页脚用）                                               | 否           |
 
 填完 `BASE_URL` 后若服务已在跑，点 **Manual Deploy → Clear build cache & deploy** 一次更稳妥。
 
 登录 magic link：未配邮件时，链接会显示在登录页；配了 Resend 则发到邮箱（测试域名通常只能发到你注册 Resend 的邮箱）。
-| `SMTP_FROM`        | 仅发邮件时：测试可用 `Usyd Due <onboarding@resend.dev>`                     | 否           |
-| `GITHUB_URL`       | 你的 GitHub 仓库链接（页脚用）                                               | 否           |
-
 
 填完 `BASE_URL` 后若服务已在跑，点 **Manual Deploy → Clear build cache & deploy** 一次更稳妥。
 
@@ -132,7 +131,7 @@ uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_
 ## 7. 和本机工具怎么分工
 
 
-|      | 本机 `remind.py` + launchd | Render 网站             |
+|      | 本机 `due-board` + launchd | Render 网站             |
 | ---- | ------------------------ | --------------------- |
 | 电脑关机 | 到点可能没通知                  | 看板仍可打开                |
 | 横幅通知 | 有                        | 无（除非以后再开邮件）           |
@@ -157,6 +156,9 @@ A: 先设 `REQUIRE_MAIL=false`，看登录页是否直接给出 magic link；或
 
 **Q: Token 安全吗？**  
 A: 存在云端数据库里（Fernet 加密）。只用你自己的 Render 账号；可随时在 Canvas/Ed 撤销 token。
+
+**Q: 我是其他学校（UNSW / Monash / 自定义）的？**  
+A: 登录后在 **Settings → Institution** 切换，默认 Canvas / Ed URL 会自动调整。
 
 ---
 

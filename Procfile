@@ -1,2 +1,2 @@
-web: usyd-due-web
-worker: usyd-due-worker --loop --interval 900
+web: due-board-web
+worker: due-board-worker --loop --interval 900

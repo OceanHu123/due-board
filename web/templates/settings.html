@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Settings · Usyd Due{% endblock %}
+{% block title %}Settings · DueBoard{% endblock %}
 {% block content %}
   <h1>Settings</h1>
   {% if is_demo %}
@@ -8,9 +8,30 @@
   {% if saved %}<p class="flash">Saved ({{ saved }}).</p>{% endif %}
   {% if error == 'demo_readonly' %}
     <p class="flash error">Demo account cannot be modified.</p>
+  {% elif error == 'bad_institution' %}
+    <p class="flash error">Unknown institution code. Pick one from the list.</p>
   {% elif error %}
     <p class="flash error">{{ error }}</p>
   {% endif %}
+
+  <section class="card">
+    <h2>Institution</h2>
+    <p class="muted">Determines the default Canvas / Ed API URLs and seeded courses. Switch carefully — clearing courses also wipes out any hand-added course IDs.</p>
+    <form method="post" action="/settings/institution">
+      <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
+        <label>Institution</label>
+        <select name="institution_code">
+          {% for code, name in institutions %}
+            <option value="{{ code }}" {% if current_institution == code %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+        <div class="row" style="margin-top:0.5rem">
+          <label style="font-size:0.88rem"><input type="checkbox" name="also_reset_courses" value="1" /> Clear courses and reseed the new institution defaults</label>
+        </div>
+        <button class="btn" type="submit">Save institution</button>
+      </fieldset>
+    </form>
+  </section>
 
   <section class="card">
     <h2>Connect Canvas / Ed</h2>
@@ -23,12 +44,16 @@
       <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
         <label>Canvas API token (leave blank to keep)</label>
         <input name="canvas_token" type="password" autocomplete="off" placeholder="Paste new token" />
-        <label>Canvas API URL</label>
-        <input name="canvas_api_url" value="{{ user.canvas_api_url }}" />
+        <label>Canvas API URL
+          {% if institution_defaults.canvas_url %}
+            <span class="muted" style="font-weight:400">(institution default shown if empty)</span>
+          {% endif %}
+        </label>
+        <input name="canvas_api_url" value="{{ user.canvas_api_url }}" placeholder="{{ institution_defaults.canvas_url }}" />
         <label>Ed API token (leave blank to keep)</label>
         <input name="ed_token" type="password" autocomplete="off" placeholder="Paste new token" />
         <label>Ed API base URL</label>
-        <input name="ed_base_url" value="{{ user.ed_base_url }}" />
+        <input name="ed_base_url" value="{{ user.ed_base_url }}" placeholder="{{ institution_defaults.ed_url }}" />
         <div class="row">
           <label><input type="checkbox" name="clear_canvas" value="1" /> Clear Canvas token</label>
           <label><input type="checkbox" name="clear_ed" value="1" /> Clear Ed token</label>

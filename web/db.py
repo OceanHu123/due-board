@@ -5,12 +5,11 @@ from datetime import datetime, timezone
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
-from web.config import database_url, get_settings
+from web.config import DEFAULT_INSTITUTION_CODE, database_url, get_settings
 
 
 class Base(DeclarativeBase):
     pass
-
 
 
 class User(Base):
@@ -21,13 +20,17 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    # Multi-institution support: defaults to the server-level default (usually 'usyd').
+    institution_code: Mapped[str] = mapped_column(
+        String(32), default=DEFAULT_INSTITUTION_CODE, index=True
+    )
 
     canvas_token_enc: Mapped[str] = mapped_column(Text, default="")
     canvas_api_url: Mapped[str] = mapped_column(
-        String(512), default="https://canvas.sydney.edu.au/api/v1"
+        String(512), default=""  # per-user override; default comes from institution
     )
     ed_token_enc: Mapped[str] = mapped_column(Text, default="")
-    ed_base_url: Mapped[str] = mapped_column(String(512), default="https://edstem.org/api")
+    ed_base_url: Mapped[str] = mapped_column(String(512), default="")
 
     email_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
     horizon_days: Mapped[int] = mapped_column(Integer, default=3)
@@ -128,5 +131,26 @@ def reconfigure_db() -> None:
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+def _migrate_schema() -> None:
+    """Idempotent lightweight migrations: create_all never alters pre-existing tables."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    if insp.has_table("users"):
+        cols = {c["name"] for c in insp.get_columns("users")}
+        if "institution_code" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE users ADD COLUMN institution_code VARCHAR(32) "
+                        f"NOT NULL DEFAULT '{DEFAULT_INSTITUTION_CODE}'"
+                    )
+                )
+                conn.execute(
+                    text("CREATE INDEX ix_users_institution_code ON users (institution_code)")
+                )
+
+
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    _migrate_schema()

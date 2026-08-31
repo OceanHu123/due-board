@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 
 from dues_lib import DueItem
 from web.auth import create_session, current_user, logout, request_magic_link, verify_magic_link
-from web.config import get_settings
+from web.config import (
+    DEFAULT_INSTITUTION_CODE,
+    get_settings,
+    institution_by_code,
+    institutions_choices,
+)
 from web.crypto import encrypt_secret
 from web.db import DueCache, ExtraTask, SessionLocal, User, UserCourse, init_db
 from web.demo import ensure_demo_user, is_demo_user, seed_demo_dues
@@ -23,7 +28,7 @@ from web.sync import ensure_default_courses, sync_user_dues
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="Usyd Due")
+app = FastAPI(title="DueBoard")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -235,6 +240,12 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse("/login", status_code=303)
     ensure_default_courses(db, user)
+    # Per-institution fallbacks shown as placeholders when the user hasn't overridden.
+    inst = institution_by_code(user.institution_code) or {}
+    defaults = {
+        "canvas_url": inst.get("canvas_url") or "",
+        "ed_url": inst.get("ed_base_url") or "",
+    }
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -248,8 +259,39 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
             "saved": request.query_params.get("saved"),
             "error": request.query_params.get("error"),
             "is_demo": is_demo_user(user),
+            "institutions": institutions_choices(),
+            "current_institution": user.institution_code,
+            "institution_defaults": defaults,
         },
     )
+
+
+@app.post("/settings/institution")
+def save_institution(
+    request: Request,
+    db: Session = Depends(get_db),
+    institution_code: str = Form(...),
+    also_reset_courses: str | None = Form(None),
+):
+    """Switch the user's institution. Optionally reseed course defaults to the new set."""
+    user = current_user(db, request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if is_demo_user(user):
+        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    code = institution_code.strip().lower()
+    if institution_by_code(code) is None:
+        return RedirectResponse("/settings?error=bad_institution", status_code=303)
+    switched = user.institution_code != code
+    user.institution_code = code
+    if switched and also_reset_courses:
+        # Clear old courses and seed new institution defaults.
+        for c in list(user.courses):
+            db.delete(c)
+        db.flush()
+        ensure_default_courses(db, user)
+    db.commit()
+    return RedirectResponse("/settings?saved=institution", status_code=303)
 
 
 @app.post("/settings/tokens")
@@ -257,9 +299,9 @@ def save_tokens(
     request: Request,
     db: Session = Depends(get_db),
     canvas_token: str = Form(""),
-    canvas_api_url: str = Form("https://canvas.sydney.edu.au/api/v1"),
+    canvas_api_url: str = Form(""),
     ed_token: str = Form(""),
-    ed_base_url: str = Form("https://edstem.org/api"),
+    ed_base_url: str = Form(""),
     clear_canvas: str | None = Form(None),
     clear_ed: str | None = Form(None),
 ):
@@ -268,18 +310,26 @@ def save_tokens(
         return RedirectResponse("/login", status_code=303)
     if is_demo_user(user):
         return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    inst = institution_by_code(user.institution_code) or {}
     if clear_canvas:
         user.canvas_token_enc = ""
     elif canvas_token.strip():
         user.canvas_token_enc = encrypt_secret(canvas_token.strip())
-    if canvas_api_url.strip():
-        user.canvas_api_url = canvas_api_url.strip().rstrip("/")
+    # URL storage: clear the stored override so the institution default takes over
+    # when the value matches the institution default. Preserve the value when the
+    # user explicitly customised it.
+    c_url = canvas_api_url.strip().rstrip("/")
+    default_canvas = (inst.get("canvas_url") or "").rstrip("/")
+    user.canvas_api_url = "" if (not c_url or c_url == default_canvas) else c_url
+
     if clear_ed:
         user.ed_token_enc = ""
     elif ed_token.strip():
         user.ed_token_enc = encrypt_secret(ed_token.strip())
-    if ed_base_url.strip():
-        user.ed_base_url = ed_base_url.strip().rstrip("/")
+    e_url = ed_base_url.strip().rstrip("/")
+    default_ed = (inst.get("ed_base_url") or "").rstrip("/")
+    user.ed_base_url = "" if (not e_url or e_url == default_ed) else e_url
+
     db.commit()
     return RedirectResponse("/settings?saved=tokens", status_code=303)
 

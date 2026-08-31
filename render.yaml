@@ -5,7 +5,7 @@
 
 services:
   - type: web
-    name: usyd-due-web
+    name: due-board
     runtime: docker
     plan: free
     healthCheckPath: /healthz
@@ -18,7 +18,7 @@ services:
         sync: false
       - key: DATABASE_URL
         fromDatabase:
-          name: usyd-due-db
+          name: due-board-db
           property: connectionString
       - key: REQUIRE_MAIL
         value: "false"
@@ -27,8 +27,8 @@ services:
       - key: SMTP_FROM
         sync: false
       - key: GITHUB_URL
-        value: https://github.com/OceanHu123/usyd-due-reminders
+        value: https://github.com/OceanHu123/due-board
 
 databases:
-  - name: usyd-due-db
+  - name: due-board-db
     plan: free

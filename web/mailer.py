@@ -8,7 +8,7 @@ import httpx
 
 from web.config import get_settings
 
-log = logging.getLogger("usyd_due.mail")
+log = logging.getLogger("due_board.mail")
 
 
 class MailNotConfiguredError(RuntimeError):

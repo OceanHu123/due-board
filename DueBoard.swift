@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private static func defaultPagePath() -> String {
-        NSString(string: "~/.local/state/usyd-due-reminders/dues.html").expandingTildeInPath
+        NSString(string: "~/.local/state/due-board/dues.html").expandingTildeInPath
     }
 
     private func openLatestPage() {
@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             if !granted {
                 fputs(
-                    "notification permission not granted — enable UsydDueReminders in System Settings → Notifications\n",
+                    "notification permission not granted — enable DueBoard in System Settings → Notifications\n",
                     stderr
                 )
                 // Still open the page so the user sees details.

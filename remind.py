@@ -101,7 +101,7 @@ def write_due_page(path: Path, items: list[DueItem], now: datetime, mode: str, h
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Usyd Due · {html.escape(mode_label)}</title>
+<title>DueBoard · {html.escape(mode_label)}</title>
 <style>
   :root {{
     --bg: #f4f1ea; --ink: #1c1917; --muted: #57534e; --card: #fffdf8;
@@ -155,12 +155,12 @@ def write_due_page(path: Path, items: list[DueItem], now: datetime, mode: str, h
 <body>
 <main>
   <header>
-    <h1>Usyd Due</h1>
+    <h1>DueBoard</h1>
     <p>{html.escape(mode_label)} · 生成于 {html.escape(generated)}</p>
     <span class="count">{len(items)} 项未交</span>
   </header>
   <section class="list">{body}</section>
-  <footer>本机可选工具。多用户请用 Web 平台：<code>uv run usyd-due-web</code></footer>
+  <footer>本机可选工具。多用户请用 Web 平台：<code>uv run due-board-web</code></footer>
 </main>
 </body>
 </html>
@@ -170,8 +170,8 @@ def write_due_page(path: Path, items: list[DueItem], now: datetime, mode: str, h
 
 
 NOTIFY_APP_CANDIDATES = [
-    Path.home() / "Applications" / "UsydDueReminders.app" / "Contents" / "MacOS" / "UsydDueReminders",
-    ROOT / "UsydDueReminders.app" / "Contents" / "MacOS" / "UsydDueReminders",
+    Path.home() / "Applications" / "DueBoard.app" / "Contents" / "MacOS" / "DueBoard",
+    ROOT / "DueBoard.app" / "Contents" / "MacOS" / "DueBoard",
 ]
 
 
@@ -248,7 +248,7 @@ def decide_mode(now: datetime, last: datetime | None, catch_up_hours: float, for
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Usyd Canvas + Ed due reminders (local optional)")
+    parser = argparse.ArgumentParser(description="Canvas + Ed due reminders (local optional; formerly usyd-due)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--open", action="store_true")
@@ -262,12 +262,12 @@ def main(argv: list[str] | None = None) -> int:
         if not page_path.is_file():
             page_path.parent.mkdir(parents=True, exist_ok=True)
             page_path.write_text(
-                "<!DOCTYPE html><meta charset=utf-8><title>Usyd Due</title>"
+                "<!DOCTYPE html><meta charset=utf-8><title>DueBoard</title>"
                 "<body style='font-family:sans-serif;padding:2rem'>"
-                "<h1>Usyd Due 测试页</h1></body>",
+                "<h1>DueBoard 测试页</h1></body>",
                 encoding="utf-8",
             )
-        notify("Usyd Due 测试", "点这条通知应打开 due 详情页。", args.dry_run, page=page_path)
+        notify("DueBoard 测试", "点这条通知应打开 due 详情页。", args.dry_run, page=page_path)
         return 0
 
     tz = ZoneInfo(cfg.get("timezone") or "Australia/Sydney")

@@ -2,7 +2,7 @@ timezone: Australia/Sydney
 horizon_days: 3
 canvas_env: /Users/oakley/Projects/mcp/canvas-mcp/.env
 ed_env: /Users/oakley/Projects/mcp/ed-mcp/.env
-state_file: /Users/oakley/.local/state/usyd-due-reminders/last-run
+state_file: /Users/oakley/.local/state/due-board/last-run
 catch_up_hours: 20
 
 exclude_title_substrings:

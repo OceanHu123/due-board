@@ -1,12 +1,15 @@
-# Usyd Due
+# DueBoard
 
-**Multi-tenant web app that syncs University of Sydney Canvas + Ed deadlines, encrypts per-user API tokens, and sends timezone-aware email digests (`Australia/Sydney`).**
+**Multi-tenant, multi-institution web app that syncs Canvas + Ed LMS deadlines, encrypts per-user API tokens, and sends timezone-aware email digests (defaults to `Australia/Sydney`).**
+
+> Formerly **Usyd Due** (University of Sydney focused). Now institution-agnostic — pick your school and the correct Canvas / Ed URLs are pre-filled.
+
 
 Live demo (after you deploy): set `BASE_URL` in Render and link it here. Locally: [http://127.0.0.1:8000](http://127.0.0.1:8000) → **Try demo**.
 
 **Deploy to Render (free `*.onrender.com`, no custom domain):** step-by-step in Chinese — [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md).
 
-Not affiliated with the University of Sydney.
+Not affiliated with any listed university.
 
 ## Problem
 
@@ -14,6 +17,7 @@ Students juggle Canvas assignments and Ed lessons with different UIs and due rul
 
 ## Features
 
+- **Multi-institution support** — USYD, UNSW, Unimelb, Monash, ANU, UQ, and a Custom preset out of the box
 - Magic-link sign-in (email)
 - Encrypted Canvas / Ed token storage (Fernet)
 - Due board: course, title, deadline, remaining time, source, deep link
@@ -61,16 +65,16 @@ Python 3.12 · FastAPI · SQLAlchemy · Postgres (prod) / SQLite (dev) · Fernet
 
 ## Demo
 
-Landing → **Try demo** signs you in as `demo@usyd-due.local` with seeded fictional dues. Recruiters can explore the board without Usyd accounts.
+Landing → **Try demo** signs you in as `demo@due-board.local` with seeded fictional dues. Recruiters can explore the board without LMS accounts.
 
 ## Local development
 
 ```sh
 cp .env.example .env
 uv sync --extra dev
-uv run usyd-due-web
+uv run due-board-web
 # another terminal — optional worker
-uv run usyd-due-worker
+uv run due-board-worker
 uv run pytest -q
 ```
 
@@ -82,7 +86,7 @@ Without `RESEND_API_KEY` / SMTP, magic links print on the login page and in the 
 2. Generate Fernet key: `python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'`
 3. Blueprint: connect the repo and apply [`render.yaml`](render.yaml) (web + worker + Postgres).
 4. Set env: `BASE_URL=https://<service>.onrender.com`, `TOKEN_FERNET_KEY`, `RESEND_API_KEY`, `SMTP_FROM`, `REQUIRE_MAIL=true`.
-5. Health check: `/healthz`. Worker command: `usyd-due-worker` (run every 10–15 minutes or as a background worker loop via cron).
+5. Health check: `/healthz`. Worker command: `due-board-worker` (run every 10–15 minutes or as a background worker loop via cron).
 
 `postgres://` URLs from Render are normalized to `postgresql+psycopg://`.
 
@@ -98,5 +102,5 @@ Personal backup only — classmates use the website.
 
 ```sh
 ./install-notifier.sh && ./install-launchd.sh
-uv run usyd-due --dry-run --mode summary
+uv run due-board --dry-run --mode summary
 ```
