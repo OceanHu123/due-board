@@ -100,6 +100,44 @@ def _sync_stale(user: User, *, max_age_seconds: int = 300) -> bool:
     return age >= max_age_seconds
 
 
+def _is_htmx(request: Request) -> bool:
+    """True when the request comes from htmx (fragment responses swap into the page)."""
+    return request.headers.get("HX-Request") == "true"
+
+
+def _board_context(
+    db: Session,
+    user: User,
+    request: Request,
+    *,
+    flash_synced: str | None = None,
+    flash_error: str | None = None,
+    auto_error: str | None = None,
+) -> dict:
+    """Shared context for the board page and its htmx fragments."""
+    tz = ZoneInfo(user.timezone or "Australia/Sydney")
+    now = datetime.now(tz)
+    all_items = _board_items(db, user)
+    selected = (request.query_params.get("course") or "").strip().upper()
+    items = [i for i in all_items if i.course.upper() == selected] if selected else all_items
+    courses_present: list[str] = []
+    for i in all_items:
+        if i.course not in courses_present:
+            courses_present.append(i.course)
+    return {
+        "user": user,
+        "items": items,
+        "now": now,
+        "settings": get_settings(),
+        "is_demo": is_demo_user(user),
+        "flash_synced": flash_synced,
+        "flash_error": flash_error,
+        "auto_error": auto_error,
+        "selected_course": selected or None,
+        "courses_present": courses_present,
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     user = current_user(db, request)
@@ -111,50 +149,61 @@ def home(request: Request, db: Session = Depends(get_db)):
         )
     ensure_default_courses(db, user)
     # Opening the board refreshes remaining unfinished dues when cache is stale.
-    auto_synced = False
+    flash_synced: str | None = None
     auto_error: str | None = None
-    if request.query_params.get("synced") is None and _sync_stale(user):
+    synced = request.query_params.get("synced")
+    if synced is None and _sync_stale(user):
         try:
             if is_demo_user(user):
                 seed_demo_dues(db, user)
             else:
                 sync_user_dues(db, user)
-            auto_synced = True
+            flash_synced = "已自动刷新未完成项。"
             db.refresh(user)
         except Exception as exc:  # noqa: BLE001
             auto_error = str(exc)[:120]
             db.refresh(user)
-    tz = ZoneInfo(user.timezone or "Australia/Sydney")
-    now = datetime.now(tz)
-    items = _board_items(db, user)
-    return templates.TemplateResponse(
-        request,
-        "board.html",
-        {
-            "user": user,
-            "items": items,
-            "now": now,
-            "settings": get_settings(),
-            "is_demo": is_demo_user(user),
-            "auto_synced": auto_synced,
-            "auto_error": auto_error,
-        },
+    elif synced == "demo":
+        flash_synced = "演示数据已刷新。"
+    elif synced:
+        flash_synced = "已刷新：下面只显示还没交完的 due。"
+    ctx = _board_context(
+        db, user, request,
+        flash_synced=flash_synced,
+        flash_error=request.query_params.get("error"),
+        auto_error=auto_error,
     )
+    if _is_htmx(request):
+        return templates.TemplateResponse(request, "partials/board_items.html", ctx)
+    return templates.TemplateResponse(request, "board.html", ctx)
 
 
-@app.get("/refresh")
+@app.api_route("/refresh", methods=["GET", "POST"])
 def refresh_board(request: Request, db: Session = Depends(get_db)):
-    """One-click refresh: re-sync then show remaining unfinished dues."""
+    """One-click refresh: re-sync then show remaining unfinished dues.
+
+    htmx requests get the updated board region back directly (no page reload);
+    plain browser requests keep the classic redirect flow.
+    """
     user = current_user(db, request)
     if not user:
         return RedirectResponse("/login", status_code=303)
     if is_demo_user(user):
         seed_demo_dues(db, user)
+        if _is_htmx(request):
+            ctx = _board_context(db, user, request, flash_synced="演示数据已刷新。")
+            return templates.TemplateResponse(request, "partials/board_items.html", ctx)
         return RedirectResponse("/?synced=demo", status_code=303)
     try:
         sync_user_dues(db, user)
     except Exception as exc:  # noqa: BLE001
+        if _is_htmx(request):
+            ctx = _board_context(db, user, request, flash_error=str(exc)[:120])
+            return templates.TemplateResponse(request, "partials/board_items.html", ctx)
         return RedirectResponse(f"/?error={quote(str(exc)[:120])}", status_code=303)
+    if _is_htmx(request):
+        ctx = _board_context(db, user, request, flash_synced="已刷新：下面只显示还没交完的 due。")
+        return templates.TemplateResponse(request, "partials/board_items.html", ctx)
     return RedirectResponse("/?synced=1", status_code=303)
 
 

@@ -21,6 +21,7 @@ Students juggle Canvas assignments and Ed lessons with different UIs and due rul
 - Magic-link sign-in (email)
 - Encrypted Canvas / Ed token storage (Fernet)
 - Due board: course, title, deadline, remaining time, source, deep link
+- HTMX-powered UX: one-click refresh and per-course filter chips swap the board region in place (full page reload still works without JavaScript)
 - Filters: skip Drills, Canvas `submission_types: none` placeholders, already submitted work
 - Morning / evening email digests (configurable hours)
 - Public **Try demo** path with fictional dues (no LMS credentials)

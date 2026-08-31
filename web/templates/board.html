@@ -7,49 +7,5 @@
   {% if is_demo %}
     <p class="flash">演示模式（虚构 due）。<a href="/login">登录</a>后连接自己的 Canvas / Ed。</p>
   {% endif %}
-  {% if auto_synced %}
-    <p class="flash">已自动刷新未完成项。</p>
-  {% elif request.query_params.get('synced') == 'demo' %}
-    <p class="flash">演示数据已刷新。</p>
-  {% elif request.query_params.get('synced') %}
-    <p class="flash">已刷新：下面只显示还没交完的 due。</p>
-  {% endif %}
-  {% if auto_error %}
-    <p class="flash error">自动刷新失败：{{ auto_error }}</p>
-  {% endif %}
-  {% if request.query_params.get('error') %}
-    <p class="flash error">刷新失败：{{ request.query_params.get('error') }}</p>
-  {% endif %}
-  {% if user.last_sync_error and not is_demo and not auto_error %}
-    <p class="flash error">上次同步错误：{{ user.last_sync_error }}</p>
-  {% endif %}
-  {% if user.last_sync_at %}
-    <p class="muted">上次刷新：{{ user.last_sync_at }}</p>
-  {% endif %}
-
-  <p style="margin:1rem 0">
-    <a class="btn" href="/refresh">{% if is_demo %}刷新演示{% else %}刷新未完成 due{% endif %}</a>
-  </p>
-  <p class="muted" style="margin-top:-0.5rem">点刷新会重新拉取 Canvas / Ed；已提交的不会再出现。</p>
-
-  {% if not items %}
-    <p class="card muted">这个时间窗口里没有未完成的 due。先在「设置」保存 token，再点刷新。</p>
-  {% else %}
-    <p><span class="flash">还剩 {{ items|length }} 项未完成</span></p>
-    {% for item in items %}
-      <article class="card {% if item.due.date() == now.date() %}today{% endif %}">
-        <div style="display:flex;justify-content:space-between;gap:1rem">
-          <strong style="color:var(--accent)">{{ item.course }}</strong>
-          <span class="muted">{% if item.due.date() == now.date() %}今天{% else %}{{ item.due.strftime('%d %b') }}{% endif %}</span>
-        </div>
-        <h2 style="font-size:1.1rem;margin:0.35rem 0">{{ item.title }}</h2>
-        <p style="margin:0.2rem 0"><strong>截止</strong> {{ item.due.strftime('%a %d %b %Y · %I:%M %p') }}</p>
-        <p style="margin:0.2rem 0">{{ item.remaining(now) }}</p>
-        <p class="muted" style="margin:0.2rem 0;font-size:0.85rem">{{ item.detail or item.source }}</p>
-        {% if item.url %}
-          <p><a class="btn" href="{{ item.url }}" target="_blank" rel="noopener">打开</a></p>
-        {% endif %}
-      </article>
-    {% endfor %}
-  {% endif %}
+  {% include "partials/board_items.html" %}
 {% endblock %}

@@ -1,0 +1,60 @@
+<div id="board-region" class="fade-swap">
+  {% if flash_synced %}<p class="flash">{{ flash_synced }}</p>{% endif %}
+  {% if flash_error %}<p class="flash error">{{ flash_error }}</p>{% endif %}
+  {% if auto_error %}<p class="flash error">自动刷新失败：{{ auto_error }}</p>{% endif %}
+  {% if user.last_sync_error and not is_demo and not flash_error and not auto_error %}
+    <p class="flash error">上次同步错误：{{ user.last_sync_error }}</p>
+  {% endif %}
+  {% if user.last_sync_at %}
+    <p class="muted">上次刷新：{{ user.last_sync_at }}</p>
+  {% endif %}
+
+  <p style="margin:1rem 0">
+    <a class="btn btn-when-loading" href="/refresh"
+       hx-post="/refresh" hx-target="#board-region" hx-swap="outerHTML">
+      <span class="spinner"></span>
+      {% if is_demo %}刷新演示{% else %}刷新未完成 due{% endif %}
+    </a>
+  </p>
+  <p class="muted" style="margin-top:-0.5rem">点刷新会重新拉取 Canvas / Ed；已提交的不会再出现。</p>
+
+  {% if courses_present|length > 1 %}
+    <div class="chips">
+      <a class="chip {% if not selected_course %}active{% endif %}"
+         href="/" hx-get="/" hx-target="#board-region" hx-swap="outerHTML" hx-push-url="true">全部</a>
+      {% for c in courses_present %}
+        <a class="chip {% if selected_course == c %}active{% endif %}"
+           href="/?course={{ c | urlencode }}"
+           hx-get="/?course={{ c | urlencode }}"
+           hx-target="#board-region" hx-swap="outerHTML" hx-push-url="true">{{ c }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if not items %}
+    {% if selected_course %}
+      <p class="card muted">课程 {{ selected_course }} 在这个时间窗口里没有未完成的 due。</p>
+    {% else %}
+      <p class="card muted">这个时间窗口里没有未完成的 due。先在「设置」保存 token，再点刷新。</p>
+    {% endif %}
+  {% else %}
+    <p><span class="flash">
+      {% if selected_course %}{{ selected_course }} · {% endif %}还剩 {{ items|length }} 项未完成
+    </span></p>
+    {% for item in items %}
+      <article class="card {% if item.due.date() == now.date() %}today{% endif %}">
+        <div style="display:flex;justify-content:space-between;gap:1rem">
+          <strong style="color:var(--accent)">{{ item.course }}</strong>
+          <span class="muted">{% if item.due.date() == now.date() %}今天{% else %}{{ item.due.strftime('%d %b') }}{% endif %}</span>
+        </div>
+        <h2 style="font-size:1.1rem;margin:0.35rem 0">{{ item.title }}</h2>
+        <p style="margin:0.2rem 0"><strong>截止</strong> {{ item.due.strftime('%a %d %b %Y · %I:%M %p') }}</p>
+        <p style="margin:0.2rem 0">{{ item.remaining(now) }}</p>
+        <p class="muted" style="margin:0.2rem 0;font-size:0.85rem">{{ item.detail or item.source }}</p>
+        {% if item.url %}
+          <p><a class="btn" href="{{ item.url }}" target="_blank" rel="noopener">打开</a></p>
+        {% endif %}
+      </article>
+    {% endfor %}
+  {% endif %}
+</div>

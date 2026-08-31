@@ -67,6 +67,43 @@ def test_demo_login_seeds_dues(client: TestClient):
         db.close()
 
 
+def test_board_course_filter(client: TestClient):
+    client.post("/demo", follow_redirects=True)
+    r = client.get("/?course=INFO1113")
+    assert r.status_code == 200
+    assert "INFO1113" in r.text
+    # MATH1064 only appears as a filter chip label; its card title must be gone.
+    assert "Weekly Online Quiz" not in r.text
+    # Unknown course → filtered empty state.
+    r2 = client.get("/?course=NOPE101")
+    assert r2.status_code == 200
+    assert "NOPE101" in r2.text  # mentioned in the empty-state message
+
+
+def test_board_htmx_fragment(client: TestClient):
+    client.post("/demo", follow_redirects=True)
+    r = client.get("/", headers={"HX-Request": "true"})
+    assert r.status_code == 200
+    assert 'id="board-region"' in r.text
+    assert "INFO1113" in r.text
+    # Fragment responses must not contain the surrounding page shell.
+    assert "<html" not in r.text.lower()
+
+
+def test_refresh_htmx_fragment_and_fallback(client: TestClient):
+    client.post("/demo", follow_redirects=True)
+    # htmx POST → partial board region, no redirect.
+    rh = client.post("/refresh", headers={"HX-Request": "true"})
+    assert rh.status_code == 200
+    assert 'id="board-region"' in rh.text
+    assert "已刷新" in rh.text or "演示数据已刷新" in rh.text
+    assert "<html" not in rh.text.lower()
+    # Plain GET (no-JS fallback) → classic 303 redirect flow.
+    rg = client.get("/refresh", follow_redirects=False)
+    assert rg.status_code == 303
+    assert rg.headers["location"].startswith("/?synced=")
+
+
 def test_demo_settings_readonly(client: TestClient):
     client.post("/demo")
     r = client.post(

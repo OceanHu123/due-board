@@ -60,9 +60,27 @@
     .cta { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1.25rem 0; }
     .steps { padding-left: 1.2rem; }
     .steps li { margin: 0.4rem 0; }
+    .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
+    .chip {
+      display: inline-block; padding: 0.25rem 0.7rem; border-radius: 999px;
+      border: 1px solid var(--line); background: var(--card); color: var(--muted);
+      font-size: 0.82rem; text-decoration: none; cursor: pointer;
+    }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .spinner {
+      display: none; width: 1rem; height: 1rem; vertical-align: -2px;
+      border: 2px solid rgba(255,255,255,0.45); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    .htmx-request .spinner, .spinner.htmx-request { display: inline-block; }
+    .htmx-request.btn-when-loading { opacity: 0.6; pointer-events: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-swap { transition: opacity 120ms ease; }
+    .htmx-swapping { opacity: 0; }
   </style>
+  <script src="/static/htmx.min.js" defer></script>
 </head>
-<body>
+<body hx-boost="true">
   <header class="top">
     <strong><a href="/" style="margin:0;color:inherit">{{ settings.app_name }}</a></strong>
     <nav>
