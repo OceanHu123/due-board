@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 WORKDIR /app
 RUN pip install --no-cache-dir uv
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md institutions.yaml ./
 COPY dues_lib ./dues_lib
 COPY web ./web
 COPY remind.py config.yaml ./

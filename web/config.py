@@ -20,6 +20,8 @@ _INSTITUTIONS_YAML = ROOT / "institutions.yaml"
 
 def _load_institutions() -> list[dict[str, Any]]:
     if not _INSTITUTIONS_YAML.is_file():
+        # Fallback: keep hard-coded defaults so Docker images that forgot to
+        # COPY institutions.yaml still behave correctly for USYD users.
         return [
             {
                 "code": "usyd",
@@ -27,7 +29,12 @@ def _load_institutions() -> list[dict[str, Any]]:
                 "canvas_url": "https://canvas.sydney.edu.au/api/v1",
                 "ed_region": "au",
                 "ed_base_url": "https://edstem.org/api",
-                "default_courses": [],
+                "default_courses": [
+                    {"code": "INFO1112", "canvas_id": 73745, "ed_id": 36385},
+                    {"code": "INFO1113", "canvas_id": 73747, "ed_id": 36387},
+                    {"code": "MATH1064", "canvas_id": 74722, "ed_id": 37261},
+                    {"code": "ELEC1601", "canvas_id": 74259, "ed_id": 39516},
+                ],
             }
         ]
     data = yaml.safe_load(_INSTITUTIONS_YAML.read_text(encoding="utf-8")) or {}
