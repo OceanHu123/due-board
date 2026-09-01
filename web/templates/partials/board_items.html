@@ -1,27 +1,27 @@
 <div id="board-region" class="fade-swap">
   {% if flash_synced %}<p class="flash">{{ flash_synced }}</p>{% endif %}
   {% if flash_error %}<p class="flash error">{{ flash_error }}</p>{% endif %}
-  {% if auto_error %}<p class="flash error">自动刷新失败：{{ auto_error }}</p>{% endif %}
-  {% if user.last_sync_error and not is_demo and not flash_error and not auto_error %}
-    <p class="flash error">上次同步错误：{{ user.last_sync_error }}</p>
+  {% if auto_error %}<p class="flash error">Auto-refresh failed: {{ auto_error }}</p>{% endif %}
+  {% if user.last_sync_error and not flash_error and not auto_error %}
+    <p class="flash error">Last sync error: {{ user.last_sync_error }}</p>
   {% endif %}
   {% if last_sync_label %}
-    <p class="muted">上次刷新：{{ last_sync_label }}</p>
+    <p class="muted">Last sync: {{ last_sync_label }}</p>
   {% endif %}
 
   <p style="margin:1rem 0">
     <a class="btn btn-when-loading" href="/refresh"
        hx-post="/refresh" hx-target="#board-region" hx-swap="outerHTML">
       <span class="spinner"></span>
-      {% if is_demo %}刷新演示{% else %}刷新未完成 due{% endif %}
+      Refresh dues
     </a>
   </p>
-  <p class="muted" style="margin-top:-0.5rem">点刷新会重新拉取 Canvas / Ed；已提交的不会再出现。</p>
+  <p class="muted" style="margin-top:-0.5rem">Click to re-pull Canvas / Ed — submitted items won't appear.</p>
 
   {% if courses_present|length > 1 %}
     <div class="chips">
       <a class="chip {% if not selected_course %}active{% endif %}"
-         href="/" hx-get="/" hx-target="#board-region" hx-swap="outerHTML" hx-push-url="true">全部</a>
+         href="/" hx-get="/" hx-target="#board-region" hx-swap="outerHTML" hx-push-url="true">All</a>
       {% for c in courses_present %}
         <a class="chip {% if selected_course == c %}active{% endif %}"
            href="/?course={{ c | urlencode }}"
@@ -33,34 +33,34 @@
 
   {% if not items %}
     {% if selected_course %}
-      <p class="card muted">课程 {{ selected_course }} 在这个时间窗口里没有未完成的 due。</p>
+      <p class="card muted">No unfinished dues for {{ selected_course }} in this window.</p>
     {% else %}
-      <p class="card muted">这个时间窗口里没有未完成的 due。先在「设置」保存 token，再点刷新。</p>
+      <p class="card muted">No unfinished dues in this window. Save your tokens in Settings, then click refresh.</p>
     {% endif %}
   {% else %}
     <p><span class="flash">
-      {% if selected_course %}{{ selected_course }} · {% endif %}还剩 {{ items|length }} 项未完成
+      {% if selected_course %}{{ selected_course }} · {% endif %}{{ items|length }} item(s) remaining
     </span></p>
     {% for item in items %}
       <article class="card {% if item.due.date() == now.date() %}today{% endif %}">
         <div style="display:flex;justify-content:space-between;gap:1rem">
           <strong style="color:var(--accent)">{{ item.course }}</strong>
-          <span class="muted">{% if item.due.date() == now.date() %}今天{% else %}{{ item.due.strftime('%d %b') }}{% endif %}</span>
+          <span class="muted">{% if item.due.date() == now.date() %}Today{% else %}{{ item.due.strftime('%d %b') }}{% endif %}</span>
         </div>
         <h2 style="font-size:1.1rem;margin:0.35rem 0">{{ item.title }}</h2>
-        <p style="margin:0.2rem 0"><strong>截止</strong> {{ item.due.strftime('%a %d %b %Y · %I:%M %p') }}</p>
+        <p style="margin:0.2rem 0"><strong>Due</strong> {{ item.due.strftime('%a %d %b %Y · %I:%M %p') }}</p>
         <p style="margin:0.2rem 0">{{ item.remaining(now) }}</p>
         <p class="muted" style="margin:0.2rem 0;font-size:0.85rem">{{ item.detail or item.source }}</p>
         {% if item.url %}
-          <p><a class="btn" href="{{ item.url }}" target="_blank" rel="noopener">打开</a></p>
+          <p><a class="btn" href="{{ item.url }}" target="_blank" rel="noopener">Open</a></p>
         {% endif %}
       </article>
     {% endfor %}
   {% endif %}
 
   {% if recurring_blocks %}
-    <h2 style="font-size:1.15rem;margin:1.5rem 0 0.25rem">本周固定时间块</h2>
-    <p class="muted" style="margin:0">Recurring time blocks · next 7 days</p>
+    <h2 style="font-size:1.15rem;margin:1.5rem 0 0.25rem">Recurring time blocks</h2>
+    <p class="muted" style="margin:0">Weekly · next 7 days</p>
     {% for b in recurring_blocks %}
       <article class="card" style="border-left:4px solid var(--accent)">
         <div style="display:flex;justify-content:space-between;gap:1rem">
@@ -70,7 +70,7 @@
         <h2 style="font-size:1.05rem;margin:0.35rem 0">{{ b.task.title }}</h2>
         <p style="margin:0.2rem 0">{{ b.start.strftime('%H:%M') }}–{{ b.end.strftime('%H:%M') }} · weekly</p>
         {% if b.task.url %}
-          <p><a class="btn ghost" href="{{ b.task.url }}" target="_blank" rel="noopener">打开</a></p>
+          <p><a class="btn ghost" href="{{ b.task.url }}" target="_blank" rel="noopener">Open</a></p>
         {% endif %}
       </article>
     {% endfor %}

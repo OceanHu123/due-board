@@ -64,21 +64,21 @@ def dues_page_path(cfg: dict[str, Any]) -> Path:
 
 def write_due_page(path: Path, items: list[DueItem], now: datetime, mode: str, horizon: int) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    mode_label = "今晚未交（当天）" if mode == "tonight" else f"今天 + 未来 {horizon} 天"
+    mode_label = "Tonight (overdue today)" if mode == "tonight" else f"Today + next {horizon} days"
     generated = now.strftime("%Y-%m-%d %H:%M %Z")
 
     if not items:
-        body = '<p class="empty">这个窗口里没有未完成的 due。</p>'
+        body = '<p class="empty">No unfinished dues in this window.</p>'
     else:
         cards: list[str] = []
         for item in items:
             when = item.due.strftime("%a %-d %b %Y · %-I:%M %p").replace("AM", "am").replace("PM", "pm")
             today = item.due.date() == now.date()
-            badge = "今天" if today else item.due.strftime("%-d %b")
+            badge = "Today" if today else item.due.strftime("%-d %b")
             link = ""
             if item.url:
                 safe = html.escape(item.url, quote=True)
-                link = f'<a class="open" href="{safe}" target="_blank" rel="noopener">打开</a>'
+                link = f'<a class="open" href="{safe}" target="_blank" rel="noopener">Open</a>'
             detail = html.escape(item.detail or item.source)
             cards.append(
                 f"""
@@ -88,7 +88,7 @@ def write_due_page(path: Path, items: list[DueItem], now: datetime, mode: str, h
     <span class="badge">{html.escape(badge)}</span>
   </div>
   <h2>{html.escape(item.title)}</h2>
-  <p class="due"><strong>截止</strong> {html.escape(when)}</p>
+  <p class="due"><strong>Due</strong> {html.escape(when)}</p>
   <p class="remain">{html.escape(item.remaining(now))}</p>
   <p class="src">{detail}</p>
   {link}
@@ -97,7 +97,7 @@ def write_due_page(path: Path, items: list[DueItem], now: datetime, mode: str, h
         body = "\n".join(cards)
 
     doc = f"""<!DOCTYPE html>
-<html lang="zh-Hans">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -156,11 +156,11 @@ def write_due_page(path: Path, items: list[DueItem], now: datetime, mode: str, h
 <main>
   <header>
     <h1>DueBoard</h1>
-    <p>{html.escape(mode_label)} · 生成于 {html.escape(generated)}</p>
-    <span class="count">{len(items)} 项未交</span>
+    <p>{html.escape(mode_label)} · generated {html.escape(generated)}</p>
+    <span class="count">{len(items)} unfinished</span>
   </header>
   <section class="list">{body}</section>
-  <footer>本机可选工具。多用户请用 Web 平台：<code>uv run due-board-web</code></footer>
+  <footer>Local CLI tool. For multi-user, use the web platform: <code>uv run due-board-web</code></footer>
 </main>
 </body>
 </html>
@@ -214,12 +214,12 @@ def notify(title: str, body: str, dry_run: bool, page: Path | None = None) -> No
 
 def format_body(items: list[DueItem], now: datetime) -> str:
     if not items:
-        return "未来几天没有到期项。点开可看详情页。"
-    head = f"{len(items)} 项 due · 点开看详情"
+        return "No upcoming dues. Open the page for details."
+    head = f"{len(items)} due(s) · click to see details"
     first = items[0].line(now)
     text = f"{head}\n{first}"
     if len(items) > 1:
-        text += f"\n另有 {len(items) - 1} 项…"
+        text += f"\n+ {len(items) - 1} more…"
     return text[:220]
 
 
@@ -264,10 +264,10 @@ def main(argv: list[str] | None = None) -> int:
             page_path.write_text(
                 "<!DOCTYPE html><meta charset=utf-8><title>DueBoard</title>"
                 "<body style='font-family:sans-serif;padding:2rem'>"
-                "<h1>DueBoard 测试页</h1></body>",
+                "<h1>DueBoard test page</h1></body>",
                 encoding="utf-8",
             )
-        notify("DueBoard 测试", "点这条通知应打开 due 详情页。", args.dry_run, page=page_path)
+        notify("DueBoard test", "Click this notification to open the due page.", args.dry_run, page=page_path)
         return 0
 
     tz = ZoneInfo(cfg.get("timezone") or "Australia/Sydney")
@@ -308,13 +308,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if not due:
         if args.dry_run:
-            print("未来几天没有到期项。" if not tonight else "今晚没有未过期的当天 due。")
+            print("No upcoming dues." if not tonight else "No overdue today-only dues for tonight.")
             print(f"mode={mode} count=0 page={page_path}")
         else:
             write_last_run(state_path, now)
         return 0
 
-    title = "今晚还没交" if tonight else "未来几天 due"
+    title = "Overdue tonight" if tonight else "Upcoming dues"
     notify(title, format_body(due, now), args.dry_run, page=page_path)
     if args.dry_run:
         print(f"mode={mode} count={len(due)} page={page_path}")

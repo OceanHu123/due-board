@@ -65,4 +65,4 @@ codesign --force --deep --sign - "$DEST" >/dev/null
 echo "Installed $DEST"
 echo "Try:  uv run due-board --open"
 echo "Then: uv run due-board --test   # click the banner → due page"
-echo "系统设置 → 通知 → DueBoard → 允许通知"
+echo "System Settings → Notifications → DueBoard → Allow notifications"

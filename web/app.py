@@ -139,9 +139,9 @@ def _board_context(
         local = dt.astimezone(tz)
         today = now.date()
         if local.date() == today:
-            return f"今天 {local.strftime('%H:%M')}"
+            return f"Today {local.strftime('%H:%M')}"
         if local.date() == today - timedelta(days=1):
-            return f"昨天 {local.strftime('%H:%M')}"
+            return f"Yesterday {local.strftime('%H:%M')}"
         return local.strftime("%d %b · %H:%M")
 
     return {
@@ -169,13 +169,13 @@ def home(request: Request, db: Session = Depends(get_db)):
     if synced is None and _sync_stale(user):
         try:
             sync_user_dues(db, user)
-            flash_synced = "已自动刷新未完成项。"
+            flash_synced = "Auto-refreshed remaining items."
             db.refresh(user)
         except Exception as exc:  # noqa: BLE001
             auto_error = str(exc)[:120]
             db.refresh(user)
     elif synced:
-        flash_synced = "已刷新：下面只显示还没交完的 due。"
+        flash_synced = "Refreshed — showing only unfinished dues."
     ctx = _board_context(
         db, user, request,
         flash_synced=flash_synced,
@@ -199,7 +199,7 @@ def refresh_board(request: Request, db: Session = Depends(get_db)):
             return templates.TemplateResponse(request, "partials/board_items.html", ctx)
         return RedirectResponse(f"/?error={quote(str(exc)[:120])}", status_code=303)
     if _is_htmx(request):
-        ctx = _board_context(db, user, request, flash_synced="已刷新：下面只显示还没交完的 due。")
+        ctx = _board_context(db, user, request, flash_synced="Refreshed — showing only unfinished dues.")
         return templates.TemplateResponse(request, "partials/board_items.html", ctx)
     return RedirectResponse("/?synced=1", status_code=303)
 

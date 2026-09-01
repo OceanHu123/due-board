@@ -63,20 +63,20 @@ class DueItem:
     def line(self, now: datetime) -> str:
         when = self.due.strftime("%-d %b %-I:%M%p").replace("AM", "am").replace("PM", "pm")
         if self.due.date() == now.date():
-            return f"{self.course} {self.title}（今天 {when}）"
-        return f"{self.course} {self.title}（{when}）"
+            return f"{self.course} {self.title} (today {when})"
+        return f"{self.course} {self.title} ({when})"
 
     def remaining(self, now: datetime) -> str:
         delta = self.due - now
         if delta.total_seconds() < 0:
-            return "已过期"
+            return "Overdue"
         hours = int(delta.total_seconds() // 3600)
         if hours < 24:
             mins = int((delta.total_seconds() % 3600) // 60)
-            return f"还剩 {hours} 小时 {mins} 分"
+            return f"{hours}h {mins}m left"
         days = hours // 24
         rem_h = hours % 24
-        return f"还剩 {days} 天 {rem_h} 小时"
+        return f"{days}d {rem_h}h left"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

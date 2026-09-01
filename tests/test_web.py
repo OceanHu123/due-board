@@ -71,7 +71,7 @@ def test_board_loads(client: TestClient):
     r = client.get("/")
     assert r.status_code == 200
     assert "DueBoard" in r.text
-    assert "还剩哪些没做完" in r.text
+    assert "What's left to do" in r.text
 
 
 def test_settings_loads(client: TestClient):
@@ -163,7 +163,7 @@ def test_recurring_time_blocks(client: TestClient):
     )
     assert "Weekly Lab" in resp.text
     board = client.get("/").text
-    assert "本周固定时间块" in board
+    assert "Recurring time blocks" in board
     assert "Weekly Lab" in board
     # Calendar includes it
     s = client.get("/settings")
