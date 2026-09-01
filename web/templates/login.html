@@ -8,7 +8,7 @@
   {% if sent %}
     <p class="flash">Link sent to <strong>{{ sent }}</strong>.</p>
     {% if dev_link %}
-      <p class="card">Dev shortcut: <a href="{{ dev_link }}">{{ dev_link }}</a></p>
+      <p class="card">Direct sign-in link (expires in {{ settings.magic_link_minutes }} min): <a href="{{ dev_link }}">{{ dev_link }}</a></p>
     {% endif %}
   {% endif %}
 

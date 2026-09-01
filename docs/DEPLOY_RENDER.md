@@ -90,22 +90,20 @@ uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_
 
 | 变量                 | 填什么                                                               | 必填？         |
 | ------------------ | ----------------------------------------------------------------- | ----------- |
-| `BASE_URL`         | 你的站点完整地址，如 `https://due-board-xxxx.onrender.com`（**不要**末尾 `/`） | 是           |
+| `BASE_URL`         | 可选，作 cookie secure 判定的 fallback；dev_link 自动从 Render header 构建     | 建议填         |
 | `SECRET_KEY`       | Blueprint 可自动生成；或自己一长串随机字符                                        | 是           |
 | `TOKEN_FERNET_KEY` | 第 2 步生成的 Fernet 密钥                                                | 是           |
 | `DATABASE_URL`     | Blueprint 从 Postgres 自动挂上即可                                       | 是（自动）       |
 | `REQUIRE_MAIL`     | 只要看板：填 `false`                                                     | 建议 `false`  |
-| `RESEND_API_KEY`   | 仅在要发邮件时填                                                          | 否           |
+| `RESEND_API_KEY`   | 仅在要发邮件时填（Resend 免费额度够个人用）                                          | 否           |
 | `SMTP_FROM`        | 仅发邮件时填（如 `DueBoard <onboarding@resend.dev>`）                           | 否           |
 | `GITHUB_URL`       | 你的 GitHub 仓库链接（页脚用）                                               | 否           |
 
-填完 `BASE_URL` 后若服务已在跑，点 **Manual Deploy → Clear build cache & deploy** 一次更稳妥。
+### 登录 magic link 怎么拿
 
-登录 magic link：未配邮件时，链接会显示在登录页；配了 Resend 则发到邮箱（测试域名通常只能发到你注册 Resend 的邮箱）。
+**不配邮件也能登录：** 点 Send magic link 后，登录页底部会显示一个 **Direct sign-in link**，点进去就能进（有效期 20 分钟）。这个链接的域名和当前页面完全一致，Render 上不会再出现 localhost 的问题。
 
-填完 `BASE_URL` 后若服务已在跑，点 **Manual Deploy → Clear build cache & deploy** 一次更稳妥。
-
-登录 magic link：未配邮件时，开发逻辑会在**登录页显示链接**；生产若 `REQUIRE_MAIL=false` 且无 Resend，同样应能在页面/日志看到链接。配了 Resend 则会发到邮箱（测试域名只能发到你注册 Resend 的邮箱）。
+**想让 magic link 真的发到邮箱：** 注册 [Resend](https://resend.com)（免费额度 3000 封/天），拿到 API Key 填到 Render 的 `RESEND_API_KEY`，再把 `SMTP_FROM` 设成 `DueBoard <onboarding@resend.dev>`（Resend 测试域名只能发到你自己注册用的邮箱）。这样既会发邮件，也仍然在登录页保留 Direct sign-in link 作安全网。
 
 ---
 

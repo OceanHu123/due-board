@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -13,6 +15,21 @@ from web.mailer import send_email
 from web.sync import ensure_default_courses
 
 COOKIE = "due_board_session"
+log = logging.getLogger("due_board.auth")
+
+
+def _external_base_url(request: Request | None = None) -> str:
+    """Best-effort production-aware base URL.
+
+    Priority: request host (respects Render's X-Forwarded-Host), then the
+    configured BASE_URL, then the hard-coded localhost fallback.
+    """
+    if request is not None:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+        scheme = request.headers.get("x-forwarded-proto") or "https"
+        if host:
+            return f"{scheme.rstrip(':')}://{host}"
+    return get_settings().base_url.rstrip("/")
 
 
 def _hash(token: str) -> str:
@@ -46,7 +63,13 @@ def create_session(db: Session, user: User, response: Response) -> None:
     _set_session_cookie(response, session_raw)
 
 
-def request_magic_link(db: Session, email: str) -> str:
+def request_magic_link(db: Session, email: str, request: Request | None = None) -> str:
+    """Create a magic link row, email it, and always return the absolute URL.
+
+    The returned URL doubles as the dev shortcut shown on the login page.
+    We build it from the incoming request's host headers so it works in prod
+    even when BASE_URL isn't explicitly set.
+    """
     settings = get_settings()
     email = email.strip().lower()
     if "@" not in email:
@@ -62,14 +85,17 @@ def request_magic_link(db: Session, email: str) -> str:
     )
     db.add(link)
     db.commit()
-    url = f"{settings.base_url.rstrip('/')}/auth/verify?token={raw}"
-    send_email(
-        email,
-        f"Sign in to {settings.app_name}",
-        f"Click to sign in (expires in {settings.magic_link_minutes} minutes):\n\n{url}\n",
-        html_body=f'<p>Click to sign in:</p><p><a href="{url}">{url}</a></p>',
-    )
-    return url if not settings.mail_configured else ""
+    url = f"{_external_base_url(request)}/auth/verify?token={raw}"
+    try:
+        send_email(
+            email,
+            f"Sign in to {settings.app_name}",
+            f"Click to sign in (expires in {settings.magic_link_minutes} minutes):\n\n{url}\n",
+            html_body=f'<p>Click to sign in:</p><p><a href="{url}">{url}</a></p>',
+        )
+    except Exception:  # noqa: BLE001 — mail failure must not block sign-in
+        log.exception("failed to send magic-link email to %s", email)
+    return url
 
 
 def verify_magic_link(db: Session, raw_token: str, response: Response) -> User:

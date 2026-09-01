@@ -275,7 +275,7 @@ def login_page(request: Request, db: Session = Depends(get_db), sent: str | None
 @app.post("/login")
 def login_submit(request: Request, email: str = Form(...), db: Session = Depends(get_db)):
     try:
-        dev_link = request_magic_link(db, email)
+        dev_link = request_magic_link(db, email, request)
     except HTTPException as exc:
         return templates.TemplateResponse(
             request,
