@@ -5,8 +5,8 @@
   {% if user.last_sync_error and not is_demo and not flash_error and not auto_error %}
     <p class="flash error">上次同步错误：{{ user.last_sync_error }}</p>
   {% endif %}
-  {% if user.last_sync_at %}
-    <p class="muted">上次刷新：{{ user.last_sync_at }}</p>
+  {% if last_sync_label %}
+    <p class="muted">上次刷新：{{ last_sync_label }}</p>
   {% endif %}
 
   <p style="margin:1rem 0">

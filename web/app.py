@@ -132,6 +132,20 @@ def _board_context(
         {"task": t, "start": s, "end": e}
         for t, s, e in recurring_occurrences(user.recurring_tasks, tz2, days=7, now=now)
     ]
+
+    def _fmt_last_sync(dt: datetime | None) -> str:
+        if not dt:
+            return ""
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        local = dt.astimezone(tz)
+        today = now.date()
+        if local.date() == today:
+            return f"今天 {local.strftime('%H:%M')}"
+        if local.date() == today - timedelta(days=1):
+            return f"昨天 {local.strftime('%H:%M')}"
+        return local.strftime("%d %b · %H:%M")
+
     return {
         "user": user,
         "items": items,
@@ -144,6 +158,7 @@ def _board_context(
         "selected_course": selected or None,
         "courses_present": courses_present,
         "recurring_blocks": blocks,
+        "last_sync_label": _fmt_last_sync(user.last_sync_at),
     }
 
 
