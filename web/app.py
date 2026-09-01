@@ -474,6 +474,53 @@ def sync_now(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/?synced=1", status_code=303)
 
 
+@app.get("/debug/sync")
+def debug_sync(request: Request, db: Session = Depends(get_db)):
+    """Temporary debug endpoint: shows raw Canvas API responses per course."""
+    import json as _json
+
+    import httpx
+
+    from web.crypto import decrypt_secret
+
+    user = get_board_user(db)
+    inst = institution_by_code(user.institution_code) or {}
+    base = (user.canvas_api_url or inst.get("canvas_url") or "").rstrip("/")
+    token = decrypt_secret(user.canvas_token_enc) if user.canvas_token_enc else ""
+    courses = user.courses
+    out: dict = {"base_url": base, "has_token": bool(token), "courses": [], "error": None}
+    if not token or not base:
+        out["error"] = "No token or base URL"
+        return out
+    headers = {"Authorization": f"Bearer {token}"}
+    with httpx.Client(timeout=30.0, headers=headers) as client:
+        for c in courses:
+            url = f"{base}/courses/{c.canvas_id}/assignments"
+            r = client.get(url, params={"per_page": 100})
+            entry = {
+                "code": c.code,
+                "canvas_id": c.canvas_id,
+                "url": url,
+                "status": r.status_code,
+                "count": 0,
+                "items": [],
+            }
+            if r.status_code == 200:
+                data = r.json()
+                entry["count"] = len(data) if isinstance(data, list) else 0
+                for a in (data if isinstance(data, list) else [])[:5]:
+                    entry["items"].append({
+                        "name": a.get("name"),
+                        "due_at": a.get("due_at"),
+                        "submission_state": (a.get("submission") or {}).get("workflow_state"),
+                        "submission_types": a.get("submission_types"),
+                    })
+            else:
+                entry["body"] = r.text[:300]
+            out["courses"].append(entry)
+    return out
+
+
 def run() -> None:
     import os
 
