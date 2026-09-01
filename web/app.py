@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from dues_lib import DueItem
-from web.auth import create_session, current_user, logout, request_magic_link, verify_magic_link
+from web.auth import get_board_user
 from web.config import (
     DEFAULT_INSTITUTION_CODE,
     get_settings,
@@ -23,7 +23,6 @@ from web.config import (
 )
 from web.crypto import encrypt_secret
 from web.db import DueCache, ExtraTask, RecurringTask, SessionLocal, User, UserCourse, init_db
-from web.demo import ensure_demo_user, is_demo_user, seed_demo_dues
 from web.ical import build_ics, recurring_occurrences
 from web.sync import ensure_default_courses, sync_user_dues
 
@@ -89,8 +88,6 @@ def healthz():
 
 def _sync_stale(user: User, *, max_age_seconds: int = 300) -> bool:
     """True if board should re-pull Canvas/Ed (never synced or older than max_age)."""
-    if is_demo_user(user):
-        return False
     if not (user.canvas_token_enc or user.ed_token_enc):
         return False
     if user.last_sync_at is None:
@@ -103,13 +100,7 @@ def _sync_stale(user: User, *, max_age_seconds: int = 300) -> bool:
 
 
 def _is_htmx(request: Request) -> bool:
-    """True when the request is an htmx fragment swap — NOT a boosted nav.
-
-    HTMX boost intercepts regular link clicks and sets HX-Request=true plus
-    HX-Boosted=true; those still need full layout pages.  Only explicit
-    hx-get/hx-post interactions (e.g. the refresh button) should receive the
-    bare board_items fragment so HTMX can swap it into #board-region.
-    """
+    """True when the request is an htmx fragment swap — NOT a boosted nav."""
     if request.headers.get("HX-Request") != "true":
         return False
     return request.headers.get("HX-Boosted") != "true"
@@ -134,7 +125,6 @@ def _board_context(
     for i in all_items:
         if i.course not in courses_present:
             courses_present.append(i.course)
-    # Recurring time blocks for the next 7 days, shown under the dues list.
     tz2 = ZoneInfo(user.timezone or "Australia/Sydney")
     blocks = [
         {"task": t, "start": s, "end": e}
@@ -159,7 +149,6 @@ def _board_context(
         "items": items,
         "now": now,
         "settings": get_settings(),
-        "is_demo": is_demo_user(user),
         "flash_synced": flash_synced,
         "flash_error": flash_error,
         "auto_error": auto_error,
@@ -172,31 +161,19 @@ def _board_context(
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
-    user = current_user(db, request)
-    if not user:
-        return templates.TemplateResponse(
-            request,
-            "landing.html",
-            {"user": None, "settings": get_settings()},
-        )
+    user = get_board_user(db)
     ensure_default_courses(db, user)
-    # Opening the board refreshes remaining unfinished dues when cache is stale.
     flash_synced: str | None = None
     auto_error: str | None = None
     synced = request.query_params.get("synced")
     if synced is None and _sync_stale(user):
         try:
-            if is_demo_user(user):
-                seed_demo_dues(db, user)
-            else:
-                sync_user_dues(db, user)
+            sync_user_dues(db, user)
             flash_synced = "已自动刷新未完成项。"
             db.refresh(user)
         except Exception as exc:  # noqa: BLE001
             auto_error = str(exc)[:120]
             db.refresh(user)
-    elif synced == "demo":
-        flash_synced = "演示数据已刷新。"
     elif synced:
         flash_synced = "已刷新：下面只显示还没交完的 due。"
     ctx = _board_context(
@@ -212,20 +189,8 @@ def home(request: Request, db: Session = Depends(get_db)):
 
 @app.api_route("/refresh", methods=["GET", "POST"])
 def refresh_board(request: Request, db: Session = Depends(get_db)):
-    """One-click refresh: re-sync then show remaining unfinished dues.
-
-    htmx requests get the updated board region back directly (no page reload);
-    plain browser requests keep the classic redirect flow.
-    """
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        seed_demo_dues(db, user)
-        if _is_htmx(request):
-            ctx = _board_context(db, user, request, flash_synced="演示数据已刷新。")
-            return templates.TemplateResponse(request, "partials/board_items.html", ctx)
-        return RedirectResponse("/?synced=demo", status_code=303)
+    """One-click refresh: re-sync then show remaining unfinished dues."""
+    user = get_board_user(db)
     try:
         sync_user_dues(db, user)
     except Exception as exc:  # noqa: BLE001
@@ -244,91 +209,18 @@ def privacy(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request,
         "privacy.html",
-        {"user": current_user(db, request), "settings": get_settings()},
+        {"user": get_board_user(db), "settings": get_settings()},
     )
-
-
-@app.post("/demo")
-def try_demo(request: Request, db: Session = Depends(get_db)):
-    user = ensure_demo_user(db)
-    response = RedirectResponse("/", status_code=303)
-    create_session(db, user, response)
-    return response
-
-
-@app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, db: Session = Depends(get_db), sent: str | None = None):
-    if current_user(db, request):
-        return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse(
-        request,
-        "login.html",
-        {
-            "user": None,
-            "sent": sent,
-            "dev_link": None,
-            "settings": get_settings(),
-        },
-    )
-
-
-@app.post("/login")
-def login_submit(request: Request, email: str = Form(...), db: Session = Depends(get_db)):
-    try:
-        dev_link = request_magic_link(db, email, request)
-    except HTTPException as exc:
-        return templates.TemplateResponse(
-            request,
-            "login.html",
-            {
-                "user": None,
-                "sent": None,
-                "error": exc.detail,
-                "dev_link": None,
-                "settings": get_settings(),
-            },
-            status_code=400,
-        )
-    return templates.TemplateResponse(
-        request,
-        "login.html",
-        {
-            "user": None,
-            "sent": email.strip().lower(),
-            "dev_link": dev_link or None,
-            "settings": get_settings(),
-        },
-    )
-
-
-@app.get("/auth/verify")
-def auth_verify(token: str, db: Session = Depends(get_db)):
-    response = RedirectResponse("/", status_code=303)
-    verify_magic_link(db, token, response)
-    return response
-
-
-@app.post("/logout")
-def do_logout(request: Request, db: Session = Depends(get_db)):
-    response = RedirectResponse("/", status_code=303)
-    logout(db, request, response)
-    return response
 
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, db: Session = Depends(get_db)):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
+    user = get_board_user(db)
     ensure_default_courses(db, user)
-    ics_url = None
-    if not is_demo_user(user):
-        # Generate the calendar subscription token lazily on first settings visit.
-        if not user.ics_token:
-            user.ics_token = secrets.token_urlsafe(24)
-            db.commit()
-        ics_url = f"{get_settings().base_url.rstrip('/')}/calendar/{user.ics_token}.ics"
-    # Per-institution fallbacks shown as placeholders when the user hasn't overridden.
+    if not user.ics_token:
+        user.ics_token = secrets.token_urlsafe(24)
+        db.commit()
+    ics_url = f"{request.url.scheme}://{request.url.netloc}/calendar/{user.ics_token}.ics"
     inst = institution_by_code(user.institution_code) or {}
     defaults = {
         "canvas_url": inst.get("canvas_url") or "",
@@ -347,7 +239,6 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
             "settings": get_settings(),
             "saved": request.query_params.get("saved"),
             "error": request.query_params.get("error"),
-            "is_demo": is_demo_user(user),
             "institutions": institutions_choices(),
             "current_institution": user.institution_code,
             "institution_defaults": defaults,
@@ -358,11 +249,7 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
 
 @app.post("/settings/ics/rotate")
 def rotate_ics_token(request: Request, db: Session = Depends(get_db)):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     user.ics_token = secrets.token_urlsafe(24)
     db.commit()
     return RedirectResponse("/settings?saved=calendar", status_code=303)
@@ -370,7 +257,6 @@ def rotate_ics_token(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/calendar/{token}.ics")
 def calendar_ics(token: str, request: Request, db: Session = Depends(get_db)):
-    """Calendar-app subscription endpoint (token auth; no cookies needed)."""
     user = db.query(User).filter(User.ics_token == token).first()
     if not user:
         raise HTTPException(status_code=404, detail="calendar not found")
@@ -388,19 +274,13 @@ def save_institution(
     institution_code: str = Form(...),
     also_reset_courses: str | None = Form(None),
 ):
-    """Switch the user's institution. Optionally reseed course defaults to the new set."""
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     code = institution_code.strip().lower()
     if institution_by_code(code) is None:
         return RedirectResponse("/settings?error=bad_institution", status_code=303)
     switched = user.institution_code != code
     user.institution_code = code
     if switched and also_reset_courses:
-        # Clear old courses and seed new institution defaults.
         for c in list(user.courses):
             db.delete(c)
         db.flush()
@@ -420,19 +300,12 @@ def save_tokens(
     clear_canvas: str | None = Form(None),
     clear_ed: str | None = Form(None),
 ):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     inst = institution_by_code(user.institution_code) or {}
     if clear_canvas:
         user.canvas_token_enc = ""
     elif canvas_token.strip():
         user.canvas_token_enc = encrypt_secret(canvas_token.strip())
-    # URL storage: clear the stored override so the institution default takes over
-    # when the value matches the institution default. Preserve the value when the
-    # user explicitly customised it.
     c_url = canvas_api_url.strip().rstrip("/")
     default_canvas = (inst.get("canvas_url") or "").rstrip("/")
     user.canvas_api_url = "" if (not c_url or c_url == default_canvas) else c_url
@@ -449,30 +322,18 @@ def save_tokens(
     return RedirectResponse("/settings?saved=tokens", status_code=303)
 
 
-@app.post("/settings/reminders")
-def save_reminders(
+@app.post("/settings/preferences")
+def save_preferences(
     request: Request,
     db: Session = Depends(get_db),
-    email_reminders: str | None = Form(None),
     horizon_days: int = Form(3),
-    morning_hour: int = Form(8),
-    evening_hour: int = Form(18),
     timezone: str = Form("Australia/Sydney"),
-    reminder_lead_hours: int = Form(24),
 ):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
-    user.email_reminders = email_reminders == "on"
+    user = get_board_user(db)
     user.horizon_days = max(1, min(horizon_days, 30))
-    user.morning_hour = max(0, min(morning_hour, 23))
-    user.evening_hour = max(0, min(evening_hour, 23))
     user.timezone = timezone.strip() or "Australia/Sydney"
-    user.reminder_lead_hours = max(0, min(reminder_lead_hours, 168))
     db.commit()
-    return RedirectResponse("/settings?saved=reminders", status_code=303)
+    return RedirectResponse("/settings?saved=preferences", status_code=303)
 
 
 @app.post("/settings/courses")
@@ -483,11 +344,7 @@ def save_course(
     canvas_id: str = Form(""),
     ed_id: str = Form(""),
 ):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     code = code.strip().upper()
     if not code:
         return RedirectResponse("/settings?error=course", status_code=303)
@@ -507,11 +364,7 @@ def save_course(
 
 @app.post("/settings/courses/{course_id}/delete")
 def delete_course(course_id: int, request: Request, db: Session = Depends(get_db)):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     row = (
         db.query(UserCourse)
         .filter(UserCourse.id == course_id, UserCourse.user_id == user.id)
@@ -532,11 +385,7 @@ def add_extra(
     due_at: str = Form(...),
     url: str = Form(""),
 ):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     db.add(
         ExtraTask(
             user_id=user.id,
@@ -552,11 +401,7 @@ def add_extra(
 
 @app.post("/settings/extras/{extra_id}/delete")
 def delete_extra(extra_id: int, request: Request, db: Session = Depends(get_db)):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     row = db.query(ExtraTask).filter(ExtraTask.id == extra_id, ExtraTask.user_id == user.id).first()
     if row:
         db.delete(row)
@@ -575,11 +420,7 @@ def add_recurring(
     end_hm: str = Form(...),
     url: str = Form(""),
 ):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     course = course.strip().upper()
     start_hm = start_hm.strip()
     end_hm = end_hm.strip()
@@ -611,11 +452,7 @@ def add_recurring(
 
 @app.post("/settings/recurring/{rec_id}/delete")
 def delete_recurring(rec_id: int, request: Request, db: Session = Depends(get_db)):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user = get_board_user(db)
     row = (
         db.query(RecurringTask)
         .filter(RecurringTask.id == rec_id, RecurringTask.user_id == user.id)
@@ -629,12 +466,7 @@ def delete_recurring(rec_id: int, request: Request, db: Session = Depends(get_db
 
 @app.post("/sync")
 def sync_now(request: Request, db: Session = Depends(get_db)):
-    user = current_user(db, request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    if is_demo_user(user):
-        seed_demo_dues(db, user)
-        return RedirectResponse("/?synced=demo", status_code=303)
+    user = get_board_user(db)
     try:
         sync_user_dues(db, user)
     except Exception as exc:  # noqa: BLE001

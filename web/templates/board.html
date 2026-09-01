@@ -2,10 +2,6 @@
 {% block title %}看板 · DueBoard{% endblock %}
 {% block content %}
   <h1>还剩哪些没做完</h1>
-  <p class="muted">{{ user.email }} · {{ user.timezone }} · 未来 {{ user.horizon_days }} 天</p>
-
-  {% if is_demo %}
-    <p class="flash">演示模式（虚构 due）。<a href="/login">登录</a>后连接自己的 Canvas / Ed。</p>
-  {% endif %}
+  <p class="muted">{{ user.timezone }} · 未来 {{ user.horizon_days }} 天</p>
   {% include "partials/board_items.html" %}
 {% endblock %}

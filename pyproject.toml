@@ -22,7 +22,6 @@ dev = ["pytest>=8.0", "httpx>=0.27"]
 [project.scripts]
 due-board = "remind:main"
 due-board-web = "web.app:run"
-due-board-worker = "web.worker:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

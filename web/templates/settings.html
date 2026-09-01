@@ -2,13 +2,8 @@
 {% block title %}Settings · DueBoard{% endblock %}
 {% block content %}
   <h1>Settings</h1>
-  {% if is_demo %}
-    <p class="flash error">Demo account is read-only. Sign out and create your own account to save tokens.</p>
-  {% endif %}
   {% if saved %}<p class="flash">Saved ({{ saved }}).</p>{% endif %}
-  {% if error == 'demo_readonly' %}
-    <p class="flash error">Demo account cannot be modified.</p>
-  {% elif error == 'bad_institution' %}
+  {% if error == 'bad_institution' %}
     <p class="flash error">Unknown institution code. Pick one from the list.</p>
   {% elif error %}
     <p class="flash error">{{ error }}</p>
@@ -18,18 +13,16 @@
     <h2>Institution</h2>
     <p class="muted">Determines the default Canvas / Ed API URLs and seeded courses. Switch carefully — clearing courses also wipes out any hand-added course IDs.</p>
     <form method="post" action="/settings/institution">
-      <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
-        <label>Institution</label>
-        <select name="institution_code">
-          {% for code, name in institutions %}
-            <option value="{{ code }}" {% if current_institution == code %}selected{% endif %}>{{ name }}</option>
-          {% endfor %}
-        </select>
-        <div class="row" style="margin-top:0.5rem">
-          <label style="font-size:0.88rem"><input type="checkbox" name="also_reset_courses" value="1" /> Clear courses and reseed the new institution defaults</label>
-        </div>
-        <button class="btn" type="submit">Save institution</button>
-      </fieldset>
+      <label>Institution</label>
+      <select name="institution_code">
+        {% for code, name in institutions %}
+          <option value="{{ code }}" {% if current_institution == code %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+      <div class="row" style="margin-top:0.5rem">
+        <label style="font-size:0.88rem"><input type="checkbox" name="also_reset_courses" value="1" /> Clear courses and reseed the new institution defaults</label>
+      </div>
+      <button class="btn" type="submit">Save institution</button>
     </form>
   </section>
 
@@ -41,25 +34,23 @@
       <li>Ed: {% if has_ed %}connected{% else %}not connected{% endif %}</li>
     </ul>
     <form method="post" action="/settings/tokens">
-      <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
-        <label>Canvas API token (leave blank to keep)</label>
-        <input name="canvas_token" type="password" autocomplete="off" placeholder="Paste new token" />
-        <label>Canvas API URL
-          {% if institution_defaults.canvas_url %}
-            <span class="muted" style="font-weight:400">(institution default shown if empty)</span>
-          {% endif %}
-        </label>
-        <input name="canvas_api_url" value="{{ user.canvas_api_url }}" placeholder="{{ institution_defaults.canvas_url }}" />
-        <label>Ed API token (leave blank to keep)</label>
-        <input name="ed_token" type="password" autocomplete="off" placeholder="Paste new token" />
-        <label>Ed API base URL</label>
-        <input name="ed_base_url" value="{{ user.ed_base_url }}" placeholder="{{ institution_defaults.ed_url }}" />
-        <div class="row">
-          <label><input type="checkbox" name="clear_canvas" value="1" /> Clear Canvas token</label>
-          <label><input type="checkbox" name="clear_ed" value="1" /> Clear Ed token</label>
-        </div>
-        <button class="btn" type="submit">Save connection</button>
-      </fieldset>
+      <label>Canvas API token (leave blank to keep)</label>
+      <input name="canvas_token" type="password" autocomplete="off" placeholder="Paste new token" />
+      <label>Canvas API URL
+        {% if institution_defaults.canvas_url %}
+          <span class="muted" style="font-weight:400">(institution default shown if empty)</span>
+        {% endif %}
+      </label>
+      <input name="canvas_api_url" value="{{ user.canvas_api_url }}" placeholder="{{ institution_defaults.canvas_url }}" />
+      <label>Ed API token (leave blank to keep)</label>
+      <input name="ed_token" type="password" autocomplete="off" placeholder="Paste new token" />
+      <label>Ed API base URL</label>
+      <input name="ed_base_url" value="{{ user.ed_base_url }}" placeholder="{{ institution_defaults.ed_url }}" />
+      <div class="row">
+        <label><input type="checkbox" name="clear_canvas" value="1" /> Clear Canvas token</label>
+        <label><input type="checkbox" name="clear_ed" value="1" /> Clear Ed token</label>
+      </div>
+      <button class="btn" type="submit">Save connection</button>
     </form>
     <p class="muted" style="margin-top:0.75rem">
       Canvas: Account → Settings → New Access Token.<br />
@@ -79,44 +70,23 @@
           <button class="btn secondary" type="submit">Rotate link</button>
         </form>
       </div>
-    {% else %}
-      <p class="muted">Sign in with your own account to get a calendar feed.</p>
     {% endif %}
   </section>
 
   <section class="card">
-    <h2>Email reminders</h2>
-    <form method="post" action="/settings/reminders">
-      <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
-        <label><input type="checkbox" name="email_reminders" {% if user.email_reminders %}checked{% endif %} /> Enable email reminders</label>
-        <div class="row">
-          <div>
-            <label>Horizon (days)</label>
-            <input name="horizon_days" type="number" min="1" max="30" value="{{ user.horizon_days }}" />
-          </div>
-          <div>
-            <label>Morning hour (0–23)</label>
-            <input name="morning_hour" type="number" min="0" max="23" value="{{ user.morning_hour }}" />
-          </div>
-          <div>
-            <label>Evening hour</label>
-            <input name="evening_hour" type="number" min="0" max="23" value="{{ user.evening_hour }}" />
-          </div>
-          <div>
-            <label>Pre-deadline alert</label>
-            <select name="reminder_lead_hours">
-              {% for h in [0, 3, 6, 12, 24, 48, 72] %}
-                <option value="{{ h }}" {% if user.reminder_lead_hours == h %}selected{% endif %}>
-                  {% if h == 0 %}Off{% else %}{{ h }}h before{% endif %}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
+    <h2>Preferences</h2>
+    <form method="post" action="/settings/preferences">
+      <div class="row">
+        <div>
+          <label>Horizon (days)</label>
+          <input name="horizon_days" type="number" min="1" max="30" value="{{ user.horizon_days }}" />
         </div>
-        <label>Timezone</label>
-        <input name="timezone" value="{{ user.timezone }}" />
-        <button class="btn" type="submit">Save reminders</button>
-      </fieldset>
+        <div>
+          <label>Timezone</label>
+          <input name="timezone" value="{{ user.timezone }}" />
+        </div>
+      </div>
+      <button class="btn" type="submit">Save preferences</button>
     </form>
   </section>
 
@@ -130,16 +100,13 @@
         <td>{{ c.canvas_id or '—' }}</td>
         <td>{{ c.ed_id or '—' }}</td>
         <td>
-          {% if not is_demo %}
           <form method="post" action="/settings/courses/{{ c.id }}/delete">
             <button class="btn danger" type="submit">Delete</button>
           </form>
-          {% endif %}
         </td>
       </tr>
       {% endfor %}
     </table>
-    {% if not is_demo %}
     <form method="post" action="/settings/courses" style="margin-top:1rem">
       <div class="row">
         <div><label>Code</label><input name="code" placeholder="INFO1113" required /></div>
@@ -148,7 +115,6 @@
       </div>
       <button class="btn" type="submit">Add / update course</button>
     </form>
-    {% endif %}
   </section>
 
   <section class="card">
@@ -161,16 +127,13 @@
         <td>{{ e.title }}</td>
         <td>{{ e.due_at }}</td>
         <td>
-          {% if not is_demo %}
           <form method="post" action="/settings/extras/{{ e.id }}/delete">
             <button class="btn danger" type="submit">Delete</button>
           </form>
-          {% endif %}
         </td>
       </tr>
       {% endfor %}
     </table>
-    {% if not is_demo %}
     <form method="post" action="/settings/extras" style="margin-top:1rem">
       <div class="row">
         <div><label>Course</label><input name="course" value="INFO1113" required /></div>
@@ -182,7 +145,6 @@
       <input name="url" />
       <button class="btn" type="submit">Add extra task</button>
     </form>
-    {% endif %}
   </section>
 
   <section class="card">
@@ -196,16 +158,13 @@
         <td>{{ t.title }}</td>
         <td>{{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][t.weekday] }} {{ t.start_hm }}–{{ t.end_hm }}</td>
         <td>
-          {% if not is_demo %}
           <form method="post" action="/settings/recurring/{{ t.id }}/delete">
             <button class="btn danger" type="submit">Delete</button>
           </form>
-          {% endif %}
         </td>
       </tr>
       {% endfor %}
     </table>
-    {% if not is_demo %}
     <form method="post" action="/settings/recurring" style="margin-top:1rem">
       <div class="row">
         <div><label>Course</label><input name="course" value="INFO1113" required /></div>
@@ -225,6 +184,5 @@
       <input name="url" />
       <button class="btn" type="submit">Add time block</button>
     </form>
-    {% endif %}
   </section>
 {% endblock %}

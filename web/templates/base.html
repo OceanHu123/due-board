@@ -84,17 +84,9 @@
   <header class="top">
     <strong><a href="/" style="margin:0;color:inherit">{{ settings.app_name }}</a></strong>
     <nav>
-      {% if user %}
-        <a href="/">看板</a>
-        <a href="/refresh">刷新</a>
-        <a href="/settings">设置</a>
-        <form action="/logout" method="post" style="display:inline">
-          <button class="btn secondary" type="submit" style="margin-left:1rem">Sign out</button>
-        </form>
-      {% else %}
-        <a href="/login">Sign in</a>
-        <a href="/privacy">Privacy</a>
-      {% endif %}
+      <a href="/">看板</a>
+      <a href="/refresh">刷新</a>
+      <a href="/settings">设置</a>
     </nav>
   </header>
   <main>

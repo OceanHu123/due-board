@@ -99,22 +99,19 @@ class Settings(BaseSettings):
     # Default institution for brand-new accounts before they pick one.
     default_institution_code: str = DEFAULT_INSTITUTION_CODE
 
-    # Mail: leave empty to log magic links / digests to console (dev)
+    # Mail config retained for backward compat but unused (no-login board).
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "DueBoard <noreply@localhost>"
     resend_api_key: str = ""
-    # When true (set on Render), refuse to silently print mail — require Resend or SMTP.
     require_mail: bool = False
 
     session_hours: int = 24 * 14
     magic_link_minutes: int = 20
 
     default_horizon_days: int = 3
-    morning_hour: int = 8
-    evening_hour: int = 18
 
     demo_email: str = "demo@due-board.local"
     github_url: str = "https://github.com/OceanHu123/due-board"
