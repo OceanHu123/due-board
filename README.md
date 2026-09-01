@@ -24,6 +24,9 @@ Students juggle Canvas assignments and Ed lessons with different UIs and due rul
 - HTMX-powered UX: one-click refresh and per-course filter chips swap the board region in place (full page reload still works without JavaScript)
 - Filters: skip Drills, Canvas `submission_types: none` placeholders, already submitted work
 - Morning / evening email digests (configurable hours)
+- Smart pre-deadline alert: one email per day when dues fall inside your lead window (3–72h, configurable)
+- Calendar subscription: per-user private `calendar/<token>.ics` feed for Google / Apple / Outlook
+- Recurring weekly time blocks (labs, meetings) on the board and in the calendar feed
 - Public **Try demo** path with fictional dues (no LMS credentials)
 - Shared domain library [`dues_lib/`](dues_lib/) reused by the web worker and optional local macOS tool
 

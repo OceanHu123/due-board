@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -53,6 +53,53 @@ def _format_digest(items: list[DueItem], now: datetime, kind: str) -> tuple[str,
         f"<p><a href='{board}'>Open board</a></p>"
     )
     return subject, text, html
+
+
+def _format_lead(items: list[DueItem], now: datetime, lead_h: int) -> tuple[str, str, str]:
+    settings = get_settings()
+    board = f"{settings.base_url.rstrip('/')}/"
+    subject = f"{settings.app_name}: due within {lead_h}h ({len(items)})"
+    title = f"Closing within {lead_h} hours"
+    lines = [item.line(now) for item in items]
+    text = title + "\n\n" + "\n".join(f"- {ln}" for ln in lines)
+    text += f"\n\nOpen board: {board}\n"
+    lis = "".join(f"<li><strong>{item.course} — {item.title} — {item.remaining(now)}</strong></li>" for item in items)
+    html = f"<h2>{title}</h2><ul>{lis}</ul><p><a href='{board}'>Open board</a></p>"
+    return subject, text, html
+
+
+def maybe_send_lead_reminder(
+    db: Session,
+    user: User,
+    now: datetime,
+    items: list[DueItem],
+    to_addr: str,
+) -> int:
+    """Email dues inside the pre-deadline lead window; at most once per local day.
+
+    Returns the number of emails sent.
+    """
+    lead_h = user.reminder_lead_hours or 0
+    if lead_h <= 0:
+        return 0
+    today = now.date().isoformat()
+    if user.last_lead_reminder_date == today:
+        return 0
+    cutoff = now + timedelta(hours=lead_h)
+    lead_items = sorted(
+        (i for i in items if now <= i.due <= cutoff), key=lambda i: i.due
+    )
+    if not lead_items:
+        return 0
+    subject, text, html = _format_lead(lead_items, now, lead_h)
+    send_email(to_addr, subject, text, html)
+    user.last_lead_reminder_date = today
+    db.commit()
+    log.info(
+        "sent lead reminder to %s (account %s, %s items within %sh)",
+        to_addr, user.email, len(lead_items), lead_h,
+    )
+    return 1
 
 
 def process_user(
@@ -115,6 +162,10 @@ def process_user(
             user.last_morning_email_date = today
         db.commit()
         log.info("sent %s email to %s (account %s, %s items)", kind, to_addr, user.email, len(due))
+
+    # Smart pre-deadline alert (only during scheduled runs, not manual --force).
+    if force_kind is None:
+        maybe_send_lead_reminder(db, user, now, items, to_addr)
 
 
 def run_once(

@@ -43,9 +43,19 @@ class User(Base):
     last_morning_email_date: Mapped[str] = mapped_column(String(16), default="")
     last_evening_email_date: Mapped[str] = mapped_column(String(16), default="")
 
+    # Smart pre-deadline reminder: email once per day when dues fall inside the lead window.
+    reminder_lead_hours: Mapped[int] = mapped_column(Integer, default=24)  # 0 = off
+    last_lead_reminder_date: Mapped[str] = mapped_column(String(16), default="")
+
+    # Per-user calendar subscription token (calendar apps cannot send cookies).
+    ics_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
+
     courses: Mapped[list[UserCourse]] = relationship(back_populates="user", cascade="all, delete-orphan")
     dues: Mapped[list[DueCache]] = relationship(back_populates="user", cascade="all, delete-orphan")
     extras: Mapped[list[ExtraTask]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    recurring_tasks: Mapped[list[RecurringTask]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserCourse(Base):
@@ -72,6 +82,23 @@ class ExtraTask(Base):
     url: Mapped[str] = mapped_column(String(1024), default="")
 
     user: Mapped[User] = relationship(back_populates="extras")
+
+
+class RecurringTask(Base):
+    """Weekly recurring time block, e.g. 'Mon 18:00-19:00 project meeting'."""
+
+    __tablename__ = "recurring_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    course: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(512))
+    weekday: Mapped[int] = mapped_column(Integer)  # 0 = Monday … 6 = Sunday
+    start_hm: Mapped[str] = mapped_column(String(5))  # "HH:MM" (user-local)
+    end_hm: Mapped[str] = mapped_column(String(5))
+    url: Mapped[str] = mapped_column(String(1024), default="")
+
+    user: Mapped[User] = relationship(back_populates="recurring_tasks")
 
 
 class DueCache(Base):
@@ -138,17 +165,24 @@ def _migrate_schema() -> None:
     insp = inspect(engine)
     if insp.has_table("users"):
         cols = {c["name"] for c in insp.get_columns("users")}
+        adds: list[str] = []
         if "institution_code" not in cols:
+            adds.append(
+                "ALTER TABLE users ADD COLUMN institution_code VARCHAR(32) "
+                f"NOT NULL DEFAULT '{DEFAULT_INSTITUTION_CODE}'"
+            )
+            adds.append("CREATE INDEX ix_users_institution_code ON users (institution_code)")
+        if "reminder_lead_hours" not in cols:
+            adds.append("ALTER TABLE users ADD COLUMN reminder_lead_hours INTEGER NOT NULL DEFAULT 24")
+        if "last_lead_reminder_date" not in cols:
+            adds.append("ALTER TABLE users ADD COLUMN last_lead_reminder_date VARCHAR(16) NOT NULL DEFAULT ''")
+        if "ics_token" not in cols:
+            adds.append("ALTER TABLE users ADD COLUMN ics_token VARCHAR(64)")
+            adds.append("CREATE INDEX ix_users_ics_token ON users (ics_token)")
+        if adds:
             with engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "ALTER TABLE users ADD COLUMN institution_code VARCHAR(32) "
-                        f"NOT NULL DEFAULT '{DEFAULT_INSTITUTION_CODE}'"
-                    )
-                )
-                conn.execute(
-                    text("CREATE INDEX ix_users_institution_code ON users (institution_code)")
-                )
+                for stmt in adds:
+                    conn.execute(text(stmt))
 
 
 def init_db() -> None:

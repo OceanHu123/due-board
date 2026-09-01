@@ -68,6 +68,23 @@
   </section>
 
   <section class="card">
+    <h2>Calendar feed</h2>
+    <p class="muted">Subscribe from Google Calendar / Apple Calendar / Outlook — dues, extra tasks and recurring blocks stay in sync automatically.</p>
+    {% if ics_url %}
+      <label>Subscription URL (keep private — anyone with this link can read your schedule)</label>
+      <input value="{{ ics_url }}" readonly onclick="this.select()" />
+      <div class="row">
+        <a class="btn ghost" href="{{ ics_url }}?dl=1">Download .ics</a>
+        <form method="post" action="/settings/ics/rotate">
+          <button class="btn secondary" type="submit">Rotate link</button>
+        </form>
+      </div>
+    {% else %}
+      <p class="muted">Sign in with your own account to get a calendar feed.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
     <h2>Email reminders</h2>
     <form method="post" action="/settings/reminders">
       <fieldset {% if is_demo %}disabled{% endif %} style="border:0;padding:0;margin:0">
@@ -84,6 +101,16 @@
           <div>
             <label>Evening hour</label>
             <input name="evening_hour" type="number" min="0" max="23" value="{{ user.evening_hour }}" />
+          </div>
+          <div>
+            <label>Pre-deadline alert</label>
+            <select name="reminder_lead_hours">
+              {% for h in [0, 3, 6, 12, 24, 48, 72] %}
+                <option value="{{ h }}" {% if user.reminder_lead_hours == h %}selected{% endif %}>
+                  {% if h == 0 %}Off{% else %}{{ h }}h before{% endif %}
+                </option>
+              {% endfor %}
+            </select>
           </div>
         </div>
         <label>Timezone</label>
@@ -154,6 +181,49 @@
       <label>URL (optional)</label>
       <input name="url" />
       <button class="btn" type="submit">Add extra task</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Recurring time blocks</h2>
+    <p class="muted">Weekly fixed commitments (labs, stand-ups, gym…) shown on the board and included in the calendar feed.</p>
+    <table>
+      <tr><th>Course</th><th>Title</th><th>When</th><th></th></tr>
+      {% for t in recurrences %}
+      <tr>
+        <td>{{ t.course }}</td>
+        <td>{{ t.title }}</td>
+        <td>{{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][t.weekday] }} {{ t.start_hm }}–{{ t.end_hm }}</td>
+        <td>
+          {% if not is_demo %}
+          <form method="post" action="/settings/recurring/{{ t.id }}/delete">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% if not is_demo %}
+    <form method="post" action="/settings/recurring" style="margin-top:1rem">
+      <div class="row">
+        <div><label>Course</label><input name="course" value="INFO1113" required /></div>
+        <div><label>Title</label><input name="title" placeholder="Weekly lab" required /></div>
+        <div>
+          <label>Day</label>
+          <select name="weekday">
+            {% for name in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+              <option value="{{ loop.index0 }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div><label>Start</label><input name="start_hm" type="time" value="18:00" required /></div>
+        <div><label>End</label><input name="end_hm" type="time" value="19:00" required /></div>
+      </div>
+      <label>URL (optional)</label>
+      <input name="url" />
+      <button class="btn" type="submit">Add time block</button>
     </form>
     {% endif %}
   </section>

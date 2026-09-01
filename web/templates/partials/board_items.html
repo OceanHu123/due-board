@@ -57,4 +57,22 @@
       </article>
     {% endfor %}
   {% endif %}
+
+  {% if recurring_blocks %}
+    <h2 style="font-size:1.15rem;margin:1.5rem 0 0.25rem">本周固定时间块</h2>
+    <p class="muted" style="margin:0">Recurring time blocks · next 7 days</p>
+    {% for b in recurring_blocks %}
+      <article class="card" style="border-left:4px solid var(--accent)">
+        <div style="display:flex;justify-content:space-between;gap:1rem">
+          <strong style="color:var(--accent)">{{ b.task.course }}</strong>
+          <span class="muted">{{ b.start.strftime('%a %d %b') }}</span>
+        </div>
+        <h2 style="font-size:1.05rem;margin:0.35rem 0">{{ b.task.title }}</h2>
+        <p style="margin:0.2rem 0">{{ b.start.strftime('%H:%M') }}–{{ b.end.strftime('%H:%M') }} · weekly</p>
+        {% if b.task.url %}
+          <p><a class="btn ghost" href="{{ b.task.url }}" target="_blank" rel="noopener">打开</a></p>
+        {% endif %}
+      </article>
+    {% endfor %}
+  {% endif %}
 </div>

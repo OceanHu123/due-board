@@ -158,6 +158,150 @@ def test_user_isolation(client: TestClient, monkeypatch):
     assert "Alice Only Task" not in board_b
 
 
+def test_calendar_ics_feed(client: TestClient):
+    # Real (non-demo) user: magic-link login flow.
+    r = client.post("/login", data={"email": "cal@example.com"})
+    m = re.search(r"token=([A-Za-z0-9_\-]+)", r.text)
+    assert m
+    client.get(f"/auth/verify?token={m.group(1)}")
+    # Visiting settings lazily generates the subscription token.
+    s = client.get("/settings")
+    assert "/calendar/" in s.text
+    ics_path = re.search(r'(/calendar/[A-Za-z0-9_\-]+\.ics)', s.text).group(1)
+    # Add one extra task so the feed has content.
+    client.post(
+        "/settings/extras",
+        data={"course": "INFO1113", "title": "Cal Export Task", "due_at": "2099-01-01T10:00:00+11:00"},
+    )
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    due = (datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(days=1)).isoformat()
+    client.post(
+        "/settings/extras",
+        data={"course": "INFO1113", "title": "Cal Export Task", "due_at": due},
+    )
+    ics = client.get(ics_path)
+    assert ics.status_code == 200
+    assert "text/calendar" in ics.headers["content-type"]
+    body = ics.text
+    assert "BEGIN:VCALENDAR" in body
+    assert "Cal Export Task" in body
+    # Wrong token → 404.
+    assert client.get("/calendar/not-a-real-token.ics").status_code == 404
+
+
+def test_recurring_time_blocks(client: TestClient):
+    from datetime import datetime
+
+    r = client.post("/login", data={"email": "rec@example.com"})
+    m = re.search(r"token=([A-Za-z0-9_\-]+)", r.text)
+    assert m
+    client.get(f"/auth/verify?token={m.group(1)}")
+    # Weekly block on today's weekday → at least one occurrence within 7 days.
+    weekday = datetime.now().weekday()
+    resp = client.post(
+        "/settings/recurring",
+        data={
+            "course": "INFO1113",
+            "title": "Weekly Lab Block",
+            "weekday": str(weekday),
+            "start_hm": "01:00",
+            "end_hm": "02:00",
+        },
+        follow_redirects=True,
+    )
+    assert "Weekly Lab Block" in resp.text
+    # Board shows the recurring section.
+    board = client.get("/").text
+    assert "本周固定时间块" in board
+    assert "Weekly Lab Block" in board
+    # Calendar feed includes it too.
+    s = client.get("/settings")
+    ics_path = re.search(r'(/calendar/[A-Za-z0-9_\-]+\.ics)', s.text).group(1)
+    assert "Weekly Lab Block" in client.get(ics_path).text
+    # Delete it.
+    db = SessionLocal()
+    try:
+        rec_id = (
+            db.query(_db.RecurringTask).filter(_db.RecurringTask.title == "Weekly Lab Block").one().id
+        )
+    finally:
+        db.close()
+    resp2 = client.post(f"/settings/recurring/{rec_id}/delete", follow_redirects=True)
+    assert "Weekly Lab Block" not in resp2.text.split("Recurring time blocks")[1]
+
+
+def _login_user(client: TestClient, email: str) -> None:
+    r = client.post("/login", data={"email": email})
+    m = re.search(r"token=([A-Za-z0-9_\-]+)", r.text)
+    assert m, r.text
+    client.get(f"/auth/verify?token={m.group(1)}")
+
+
+def test_lead_reminder_setting(client: TestClient):
+    _login_user(client, "lead@example.com")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "lead@example.com").one()
+    finally:
+        db.close()
+    r = client.post(
+        "/settings/reminders",
+        data={"reminder_lead_hours": "12", "email_reminders": "on"},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    db = SessionLocal()
+    try:
+        user2 = db.query(User).filter(User.email == "lead@example.com").one()
+        assert user2.reminder_lead_hours == 12
+    finally:
+        db.close()
+
+
+def test_lead_reminder_once_per_day(client: TestClient, monkeypatch):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from dues_lib import DueItem
+    from web import worker
+
+    _login_user(client, "smart@example.com")
+    db = SessionLocal()
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        worker, "send_email", lambda to, subject, text, html=None: sent.append((subject, text))
+    )
+    try:
+        user = db.query(User).filter(User.email == "smart@example.com").one()
+        user.reminder_lead_hours = 24
+        user.last_lead_reminder_date = ""
+        db.commit()
+        now = datetime.now(ZoneInfo(user.timezone or "Australia/Sydney"))
+        items = [
+            DueItem(course="INFO1113", title="Due Soon Task", due=now + timedelta(hours=2), source="test"),
+            DueItem(course="INFO1112", title="Outside Window", due=now + timedelta(hours=40), source="test"),
+        ]
+        n = worker.maybe_send_lead_reminder(db, user, now, items, user.email)
+        assert n == 1
+        assert len(sent) == 1
+        assert "Due Soon Task" in sent[0][1]
+        assert "Outside Window" not in sent[0][1]
+        # Same day → deduped.
+        n2 = worker.maybe_send_lead_reminder(db, user, now, items, user.email)
+        assert n2 == 0
+        assert len(sent) == 1
+        # Lead window off → never sends.
+        user.reminder_lead_hours = 0
+        user.last_lead_reminder_date = ""
+        db.commit()
+        assert worker.maybe_send_lead_reminder(db, user, now, items, user.email) == 0
+        assert len(sent) == 1
+    finally:
+        db.close()
+
+
 def test_require_mail_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'm.db'}")
     monkeypatch.setenv("REQUIRE_MAIL", "true")

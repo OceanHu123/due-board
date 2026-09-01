@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -21,8 +22,9 @@ from web.config import (
     institutions_choices,
 )
 from web.crypto import encrypt_secret
-from web.db import DueCache, ExtraTask, SessionLocal, User, UserCourse, init_db
+from web.db import DueCache, ExtraTask, RecurringTask, SessionLocal, User, UserCourse, init_db
 from web.demo import ensure_demo_user, is_demo_user, seed_demo_dues
+from web.ical import build_ics, recurring_occurrences
 from web.sync import ensure_default_courses, sync_user_dues
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -124,6 +126,12 @@ def _board_context(
     for i in all_items:
         if i.course not in courses_present:
             courses_present.append(i.course)
+    # Recurring time blocks for the next 7 days, shown under the dues list.
+    tz2 = ZoneInfo(user.timezone or "Australia/Sydney")
+    blocks = [
+        {"task": t, "start": s, "end": e}
+        for t, s, e in recurring_occurrences(user.recurring_tasks, tz2, days=7, now=now)
+    ]
     return {
         "user": user,
         "items": items,
@@ -135,6 +143,7 @@ def _board_context(
         "auto_error": auto_error,
         "selected_course": selected or None,
         "courses_present": courses_present,
+        "recurring_blocks": blocks,
     }
 
 
@@ -289,6 +298,13 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse("/login", status_code=303)
     ensure_default_courses(db, user)
+    ics_url = None
+    if not is_demo_user(user):
+        # Generate the calendar subscription token lazily on first settings visit.
+        if not user.ics_token:
+            user.ics_token = secrets.token_urlsafe(24)
+            db.commit()
+        ics_url = f"{get_settings().base_url.rstrip('/')}/calendar/{user.ics_token}.ics"
     # Per-institution fallbacks shown as placeholders when the user hasn't overridden.
     inst = institution_by_code(user.institution_code) or {}
     defaults = {
@@ -302,6 +318,7 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
             "user": user,
             "courses": user.courses,
             "extras": user.extras,
+            "recurrences": user.recurring_tasks,
             "has_canvas": bool(user.canvas_token_enc),
             "has_ed": bool(user.ed_token_enc),
             "settings": get_settings(),
@@ -311,8 +328,34 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
             "institutions": institutions_choices(),
             "current_institution": user.institution_code,
             "institution_defaults": defaults,
+            "ics_url": ics_url,
         },
     )
+
+
+@app.post("/settings/ics/rotate")
+def rotate_ics_token(request: Request, db: Session = Depends(get_db)):
+    user = current_user(db, request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if is_demo_user(user):
+        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    user.ics_token = secrets.token_urlsafe(24)
+    db.commit()
+    return RedirectResponse("/settings?saved=calendar", status_code=303)
+
+
+@app.get("/calendar/{token}.ics")
+def calendar_ics(token: str, request: Request, db: Session = Depends(get_db)):
+    """Calendar-app subscription endpoint (token auth; no cookies needed)."""
+    user = db.query(User).filter(User.ics_token == token).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="calendar not found")
+    body = build_ics(db, user)
+    headers = {"Content-Type": "text/calendar; charset=utf-8"}
+    if request.query_params.get("dl"):
+        headers["Content-Disposition"] = 'attachment; filename="dueboard.ics"'
+    return Response(body, headers=headers)
 
 
 @app.post("/settings/institution")
@@ -392,6 +435,7 @@ def save_reminders(
     morning_hour: int = Form(8),
     evening_hour: int = Form(18),
     timezone: str = Form("Australia/Sydney"),
+    reminder_lead_hours: int = Form(24),
 ):
     user = current_user(db, request)
     if not user:
@@ -403,6 +447,7 @@ def save_reminders(
     user.morning_hour = max(0, min(morning_hour, 23))
     user.evening_hour = max(0, min(evening_hour, 23))
     user.timezone = timezone.strip() or "Australia/Sydney"
+    user.reminder_lead_hours = max(0, min(reminder_lead_hours, 168))
     db.commit()
     return RedirectResponse("/settings?saved=reminders", status_code=303)
 
@@ -494,6 +539,69 @@ def delete_extra(extra_id: int, request: Request, db: Session = Depends(get_db))
         db.delete(row)
         db.commit()
     return RedirectResponse("/settings?saved=extra", status_code=303)
+
+
+@app.post("/settings/recurring")
+def add_recurring(
+    request: Request,
+    db: Session = Depends(get_db),
+    course: str = Form(...),
+    title: str = Form(...),
+    weekday: int = Form(...),
+    start_hm: str = Form(...),
+    end_hm: str = Form(...),
+    url: str = Form(""),
+):
+    user = current_user(db, request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if is_demo_user(user):
+        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    course = course.strip().upper()
+    start_hm = start_hm.strip()
+    end_hm = end_hm.strip()
+    if not course or not title.strip():
+        return RedirectResponse("/settings?error=recurring", status_code=303)
+    if not (0 <= weekday <= 6):
+        return RedirectResponse("/settings?error=recurring", status_code=303)
+    for hm in (start_hm, end_hm):
+        try:
+            datetime.strptime(hm, "%H:%M")
+        except ValueError:
+            return RedirectResponse("/settings?error=recurring", status_code=303)
+    if end_hm <= start_hm:
+        return RedirectResponse("/settings?error=recurring", status_code=303)
+    db.add(
+        RecurringTask(
+            user_id=user.id,
+            course=course,
+            title=title.strip(),
+            weekday=weekday,
+            start_hm=start_hm,
+            end_hm=end_hm,
+            url=url.strip(),
+        )
+    )
+    db.commit()
+    return RedirectResponse("/settings?saved=recurring", status_code=303)
+
+
+@app.post("/settings/recurring/{rec_id}/delete")
+def delete_recurring(rec_id: int, request: Request, db: Session = Depends(get_db)):
+    user = current_user(db, request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if is_demo_user(user):
+        return RedirectResponse("/settings?error=demo_readonly", status_code=303)
+    row = (
+        db.query(RecurringTask)
+        .filter(RecurringTask.id == rec_id, RecurringTask.user_id == user.id)
+        .first()
+    )
+    if row:
+        db.delete(row)
+        db.commit()
+    return RedirectResponse("/settings?saved=recurring", status_code=303)
 
 
 @app.post("/sync")
