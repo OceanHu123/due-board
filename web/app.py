@@ -103,8 +103,16 @@ def _sync_stale(user: User, *, max_age_seconds: int = 300) -> bool:
 
 
 def _is_htmx(request: Request) -> bool:
-    """True when the request comes from htmx (fragment responses swap into the page)."""
-    return request.headers.get("HX-Request") == "true"
+    """True when the request is an htmx fragment swap — NOT a boosted nav.
+
+    HTMX boost intercepts regular link clicks and sets HX-Request=true plus
+    HX-Boosted=true; those still need full layout pages.  Only explicit
+    hx-get/hx-post interactions (e.g. the refresh button) should receive the
+    bare board_items fragment so HTMX can swap it into #board-region.
+    """
+    if request.headers.get("HX-Request") != "true":
+        return False
+    return request.headers.get("HX-Boosted") != "true"
 
 
 def _board_context(
