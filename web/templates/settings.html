@@ -92,21 +92,36 @@
 
   <section class="card">
     <h2>Courses</h2>
+    {% if discovery and discovery.error %}
+      <p class="flash error">Canvas discovery failed: {{ discovery.error }}</p>
+    {% elif discovery and discovery.discovered %}
+      <p class="flash">
+        Found {{ discovery.discovered | length }} Canvas enrolments; auto-added {{ discovery.status.added | length }} graded courses;
+        {% if discovery.status.updated %}updated IDs for {{ discovery.status.updated | join(', ') }};{% endif %}
+        {% if discovery.status.orphan %}<span title="No longer found in Canvas — delete or keep manually">⚠️ {{ discovery.status.orphan | join(', ') }} orphan</span>{% endif %}
+      </p>
+    {% elif has_canvas and (not discovery or not discovery.discovered) %}
+      <p class="muted">Save then reload once — Canvas course discovery runs on this page.</p>
+    {% endif %}
+    {% if courses %}
     <table>
       <tr><th>Code</th><th>Canvas ID</th><th>Ed ID</th><th></th></tr>
       {% for c in courses %}
-      <tr>
-        <td>{{ c.code }}</td>
-        <td>{{ c.canvas_id or '—' }}</td>
-        <td>{{ c.ed_id or '—' }}</td>
+      <tr{% if c.orphan %} style="opacity:0.65;border-left:3px solid var(--danger)" title="Orphan: code not found in your Canvas enrolments — may be stale"{% endif %}>
+        <td>{{ c.row.code }}{% if c.orphan %} <span style="color:var(--danger);font-weight:600">⚠ orphan</span>{% endif %}</td>
+        <td>{{ c.row.canvas_id or '—' }}</td>
+        <td>{{ c.row.ed_id or '—' }}</td>
         <td>
-          <form method="post" action="/settings/courses/{{ c.id }}/delete">
+          <form method="post" action="/settings/courses/{{ c.row.id }}/delete">
             <button class="btn danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% endfor %}
     </table>
+    {% else %}
+    <p class="muted">No courses yet. Save your Canvas token above and this list will auto-populate.</p>
+    {% endif %}
     <form method="post" action="/settings/courses" style="margin-top:1rem">
       <div class="row">
         <div><label>Code</label><input name="code" placeholder="INFO1113" required /></div>
@@ -116,6 +131,36 @@
       <button class="btn" type="submit">Add / update course</button>
     </form>
   </section>
+
+  {% if discovery and discovery.discovered %}
+    {% set ns = namespace(has_skipped=False) %}
+    {% for d in discovery.discovered %}
+      {% if not d.suggested %}{% set ns.has_skipped = True %}{% endif %}
+    {% endfor %}
+    {% if ns.has_skipped %}
+    <section class="card" style="opacity:0.85">
+      <h2>Other Canvas enrolments</h2>
+      <p class="muted">Portals, hubs, and non-graded courses were skipped automatically. Use the form below to add one manually.</p>
+      <table>
+        <tr><th>Code</th><th>Name</th><th>Term</th><th></th></tr>
+        {% for d in discovery.discovered if not d.suggested %}
+        <tr>
+          <td style="font-family:monospace">{{ d.raw_code }}</td>
+          <td>{{ d.name }}</td>
+          <td>{{ d.term or '—' }}</td>
+          <td>
+            <form method="post" action="/settings/courses" class="row" style="gap:0.2rem;flex-wrap:nowrap;margin:0">
+              <input type="hidden" name="code" value="{{ d.code or (d.raw_code | upper | replace(' ','_'))[:20] }}" />
+              <input type="hidden" name="canvas_id" value="{{ d.canvas_id }}" />
+              <button class="btn ghost" type="submit" style="padding:0.25rem 0.6rem;font-size:0.8rem">Add anyway</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </section>
+    {% endif %}
+  {% endif %}
 
   <section class="card">
     <h2>Extra tasks</h2>

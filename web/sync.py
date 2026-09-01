@@ -11,6 +11,7 @@ from dues_lib import (
     CourseRef,
     EdCreds,
     collect_dues,
+    discover_canvas_courses,
     window_filter,
 )
 from web.config import (
@@ -64,8 +65,91 @@ def _resolved_ed_base_url(user: User) -> str:
     return default_ed_base_url_for(user.institution_code)
 
 
+def ensure_courses_from_canvas(
+    db: Session,
+    user: User,
+    *,
+    only_suggested: bool = True,
+) -> dict:
+    """Auto-discover the user's Canvas courses via their token and reconcile.
+
+    Returns a status dict so callers can explain what happened:
+      {added: [...], updated: [...], skipped: [...], orphan: [...], total: N}
+
+    Rules:
+      - Existing course rows: if code matches a discovered course but canvas_id
+        differs (or was None), backfill the correct canvas_id.
+      - Discovered courses with `suggested=True` that have no matching code row:
+        INSERT as new UserCourse.
+      - Discovered courses with `suggested=False` (portals/hubs): never added
+        automatically, they go into `skipped` so the Settings UI can offer an
+        "Add anyway" button.
+      - Existing rows whose code is NOT present in discovered set are flagged
+        `orphan` — kept (we never silently delete user data) but the UI may
+        highlight them.
+    """
+    status = {
+        "added": [],
+        "updated": [],
+        "skipped": [],
+        "orphan": [],
+        "total": 0,
+    }
+    if not user.canvas_token_enc:
+        return status
+    from web.crypto import decrypt_secret
+
+    creds = CanvasCreds(
+        token=decrypt_secret(user.canvas_token_enc),
+        api_url=_resolved_canvas_url(user),
+    )
+    discovered = discover_canvas_courses(creds)
+    status["total"] = len(discovered)
+    by_code: dict[str, dict] = {d["code"]: d for d in discovered if d["code"]}
+    seen_codes: set[str] = set()
+    existing = list(db.query(UserCourse).filter(UserCourse.user_id == user.id).all())
+    for ec in existing:
+        seen_codes.add(ec.code.upper())
+        match = by_code.get(ec.code.upper())
+        if match is None:
+            status["orphan"].append(ec.code)
+            continue
+        if ec.canvas_id != match["canvas_id"]:
+            ec.canvas_id = match["canvas_id"]
+            status["updated"].append(ec.code)
+    for d in discovered:
+        if not d["code"]:
+            status["skipped"].append({"code": d["raw_code"] or d["name"], "reason": "no_code"})
+            continue
+        key = d["code"].upper()
+        if key in seen_codes:
+            continue
+        if only_suggested and not d["suggested"]:
+            status["skipped"].append(
+                {"code": d["code"], "name": d["name"], "reason": "not_suggested"}
+            )
+            continue
+        db.add(
+            UserCourse(
+                user_id=user.id,
+                code=key,
+                canvas_id=d["canvas_id"],
+                ed_id=None,
+            )
+        )
+        status["added"].append(key)
+    db.commit()
+    db.refresh(user)
+    return status
+
+
 def sync_user_dues(db: Session, user: User) -> list[DueCache]:
     ensure_default_courses(db, user)
+    # Auto-discover + backfill canvas_ids from the user's live enrollment list.
+    try:
+        ensure_courses_from_canvas(db, user)
+    except Exception:  # noqa: BLE001 — discovery best-effort; keep syncing
+        pass
     tz = ZoneInfo(user.timezone or "Australia/Sydney")
     courses = [
         CourseRef(code=c.code, canvas_id=c.canvas_id, ed_id=c.ed_id) for c in user.courses

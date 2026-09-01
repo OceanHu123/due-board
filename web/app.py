@@ -24,7 +24,7 @@ from web.config import (
 from web.crypto import encrypt_secret
 from web.db import DueCache, ExtraTask, RecurringTask, SessionLocal, User, UserCourse, init_db
 from web.ical import build_ics, recurring_occurrences
-from web.sync import ensure_default_courses, sync_user_dues
+from web.sync import ensure_courses_from_canvas, ensure_default_courses, sync_user_dues
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -226,12 +226,29 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
         "canvas_url": inst.get("canvas_url") or "",
         "ed_url": inst.get("ed_base_url") or "",
     }
+    # Run best-effort Canvas course discovery so the UI can show the
+    # add-anyway buttons and orphan badges.
+    discovery: dict = {"error": None, "discovered": None, "status": None}
+    if user.canvas_token_enc:
+        try:
+            discovered_list = _discover_canvas(user)
+            status = ensure_courses_from_canvas(db, user, only_suggested=True)
+            discovery["discovered"] = discovered_list
+            discovery["status"] = status
+        except Exception as exc:  # noqa: BLE001
+            discovery["error"] = str(exc)[:200]
+    # Re-query after discovery so the rendered courses list is up-to-date.
+    db.refresh(user)
+    orphan_set = set(discovery.get("status", {}).get("orphan", [])) if discovery.get("status") else set()
+    courses_rows = []
+    for c in user.courses:
+        courses_rows.append({"row": c, "orphan": c.code in orphan_set})
     return templates.TemplateResponse(
         request,
         "settings.html",
         {
             "user": user,
-            "courses": user.courses,
+            "courses": courses_rows,
             "extras": user.extras,
             "recurrences": user.recurring_tasks,
             "has_canvas": bool(user.canvas_token_enc),
@@ -243,8 +260,22 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
             "current_institution": user.institution_code,
             "institution_defaults": defaults,
             "ics_url": ics_url,
+            "discovery": discovery,
         },
     )
+
+
+def _discover_canvas(user: User) -> list:
+    from dues_lib import CanvasCreds, discover_canvas_courses
+
+    from web.crypto import decrypt_secret
+    from web.sync import _resolved_canvas_url
+
+    creds = CanvasCreds(
+        token=decrypt_secret(user.canvas_token_enc),
+        api_url=_resolved_canvas_url(user),
+    )
+    return discover_canvas_courses(creds)
 
 
 @app.post("/settings/ics/rotate")

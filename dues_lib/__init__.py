@@ -132,6 +132,114 @@ def _excluded(title: str, exclude: Sequence[str]) -> bool:
     return any(s.lower() in low for s in exclude)
 
 
+# Courses whose name/code contains these words are very unlikely to carry
+# real graded dues (student portals, hubs, orientation, lab inventory…) and
+# should be hidden by default during auto-import. Users can still add them
+# manually from Settings if needed.
+_PORTAL_HINTS = (
+    "portal",
+    "hub",
+    "orientation",
+    "network",
+    "ec)",
+    "_ec",
+    " awareness",
+    "dalyell",
+    "labs",
+    " scholars",
+    "year 1",
+)
+
+
+def _looks_like_real_course(code: str, name: str) -> bool:
+    """Heuristic: keep standard graded course codes and drop portals/hubs.
+
+    Accepts codes like 'INFO1112 (ND)' / 'MATH1064' / 'INFO1111'.
+    Rejects codes like 'ENGINEERING STUDENT PORTAL' / 'Women in Engineering'.
+    """
+    combined = f"{code or ''} {name or ''}".lower()
+    if any(h in combined for h in _PORTAL_HINTS):
+        return False
+    # Normal graded course codes look like LETTERS-DIGITS, e.g. INFO1112.
+    import re
+
+    coarse_code = (code or name or "").strip().split()[0]
+    return bool(re.match(r"^[A-Z]{3,6}\d{3,5}[A-Z]?$", coarse_code))
+
+
+def _normalise_course_code(raw: str) -> str:
+    """'ELEC1601 (ND)' → 'ELEC1601'; 'INFO1112' → 'INFO1112'."""
+    if not raw:
+        return ""
+    head = raw.strip().split()[0]
+    import re
+
+    m = re.match(r"^([A-Za-z]{2,6})(\d{3,5})[A-Za-z]?$", head)
+    if not m:
+        return head.upper()
+    return f"{m.group(1).upper()}{m.group(2)}"
+
+
+def discover_canvas_courses(creds: CanvasCreds) -> list[dict[str, Any]]:
+    """List the Canvas courses the token owner is actively enrolled in.
+
+    Returns a list of dicts with keys:
+        canvas_id  (int)        – LMS course ID (usable for assignments API)
+        code       (str)        – normalised course code, e.g. 'INFO1112'
+        raw_code   (str)        – code as Canvas returned it
+        name       (str)        – human course name
+        term       (str|None)   – term / enrollment term label if available
+        role       (str|None)   – e.g. 'StudentEnrollment'
+        suggested  (bool)       – True when we think it's a real graded course
+
+    Raises ValueError on bad credentials / malformed URL.
+    """
+    token = creds.token.strip()
+    base = creds.api_url.rstrip("/")
+    if not token or not base:
+        raise ValueError("Canvas token/api_url missing")
+    headers = {"Authorization": f"Bearer {token}"}
+    out: list[dict[str, Any]] = []
+    with httpx.Client(timeout=30.0, headers=headers) as client:
+        rows = paginate_canvas(
+            client,
+            f"{base}/courses",
+            {
+                "per_page": 100,
+                "enrollment_type": "student",
+                "include[]": ["term"],
+            },
+        )
+        for c in rows:
+            if not isinstance(c, dict):
+                continue
+            cid = c.get("id")
+            if not isinstance(cid, int):
+                continue
+            raw_code = (c.get("course_code") or c.get("code") or "").strip()
+            norm_code = _normalise_course_code(raw_code)
+            name = (c.get("name") or c.get("original_name") or "").strip()
+            term_obj = c.get("term") or {}
+            term = term_obj.get("name") if isinstance(term_obj, dict) else None
+            enrolls = c.get("enrollments") or []
+            role = enrolls[0].get("type") if isinstance(enrolls, list) and enrolls else None
+            suggested = _looks_like_real_course(raw_code or name, name)
+            out.append(
+                {
+                    "canvas_id": cid,
+                    "code": norm_code,
+                    "raw_code": raw_code,
+                    "name": name,
+                    "term": term,
+                    "role": role,
+                    "suggested": suggested,
+                }
+            )
+    # Stable order: suggested courses first, then alphabetic by code.
+    out.sort(key=lambda x: (0 if x["suggested"] else 1, x["code"] or ""))
+    return out
+
+
 def canvas_items(
     creds: CanvasCreds,
     courses: Sequence[CourseRef],
