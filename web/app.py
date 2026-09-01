@@ -487,8 +487,21 @@ def debug_sync(request: Request, db: Session = Depends(get_db)):
     inst = institution_by_code(user.institution_code) or {}
     base = (user.canvas_api_url or inst.get("canvas_url") or "").rstrip("/")
     token = decrypt_secret(user.canvas_token_enc) if user.canvas_token_enc else ""
-    courses = user.courses
-    out: dict = {"base_url": base, "has_token": bool(token), "courses": [], "error": None}
+    db.refresh(user)  # pick up any course rows seeded by get_board_user
+    courses = list(user.courses)
+    inst_defaults = inst.get("default_courses") or []
+    out: dict = {
+        "base_url": base,
+        "has_token": bool(token),
+        "institution_code": user.institution_code,
+        "institution_name": inst.get("name"),
+        "institution_default_courses_count": len(inst_defaults),
+        "user_courses_count_in_db": len(courses),
+        "user_email": user.email,
+        "ensure_default_courses_runs_on_every_call_now": True,
+        "courses": [],
+        "error": None,
+    }
     if not token or not base:
         out["error"] = "No token or base URL"
         return out

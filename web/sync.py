@@ -28,7 +28,15 @@ def ensure_default_courses(db: Session, user: User) -> None:
     Only runs when the user has **zero** configured courses — users who
     manually edited their courses won't see repeated seeds.
     """
-    if user.courses:
+    # Bypass the ORM relationship cache — query directly so we don't get
+    # a stale [] from a user object created before rows were INSERTed.
+    count = (
+        db.query(UserCourse).filter(UserCourse.user_id == user.id).count()
+    )
+    if count > 0:
+        # Refresh the relationship so caller-side user.courses is populated.
+        db.flush()
+        db.refresh(user)
         return
     for row in default_courses_for(user.institution_code):
         db.add(
