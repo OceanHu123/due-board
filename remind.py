@@ -182,18 +182,21 @@ def notify_binary() -> Path | None:
     return None
 
 
-def notify(title: str, body: str, dry_run: bool, page: Path | None = None) -> None:
+def notify(title: str, body: str, dry_run: bool, target: str | None = None) -> None:
+    """Send a macOS notification. If `target` is provided it becomes the
+    click-through destination — typically the web app URL, but a local file
+    path also works for users who self-host a static dashboard."""
     if dry_run:
         print(f"[notify] {title}\n{body}\n")
-        if page:
-            print(f"[page] {page}")
+        if target:
+            print(f"[target] {target}")
         return
 
     binary = notify_binary()
     if binary is not None:
         cmd = [str(binary), title[:60], body[:220]]
-        if page is not None:
-            cmd.append(str(page))
+        if target is not None:
+            cmd.append(target)
         result = subprocess.run(cmd, check=False, capture_output=True, text=True)
         if result.returncode == 0:
             return
@@ -201,8 +204,9 @@ def notify(title: str, body: str, dry_run: bool, page: Path | None = None) -> No
         if err:
             print(err, file=sys.stderr)
 
-    if page is not None and page.is_file():
-        subprocess.run(["open", str(page)], check=False)
+    # Final fallback: open the target directly (no notification on non-macOS).
+    if target is not None:
+        subprocess.run(["open", target], check=False)
 
     script = (
         f"display notification {json.dumps(body[:220], ensure_ascii=False)} "
@@ -248,7 +252,7 @@ def decide_mode(now: datetime, last: datetime | None, catch_up_hours: float, for
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Canvas + Ed due reminders (local optional; formerly usyd-due)")
+    parser = argparse.ArgumentParser(description="Canvas + Ed due reminders — opens the web board on click")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--open", action="store_true")
@@ -256,18 +260,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
-    page_path = dues_page_path(cfg)
+    site_url = (cfg.get("site_url") or "https://usyd-due-web.onrender.com").strip()
 
     if args.test:
-        if not page_path.is_file():
-            page_path.parent.mkdir(parents=True, exist_ok=True)
-            page_path.write_text(
-                "<!DOCTYPE html><meta charset=utf-8><title>DueBoard</title>"
-                "<body style='font-family:sans-serif;padding:2rem'>"
-                "<h1>DueBoard test page</h1></body>",
-                encoding="utf-8",
-            )
-        notify("DueBoard test", "Click this notification to open the due page.", args.dry_run, page=page_path)
+        notify(
+            "DueBoard test",
+            f"Click this notification to open your board → {site_url}",
+            args.dry_run,
+            target=site_url,
+        )
         return 0
 
     tz = ZoneInfo(cfg.get("timezone") or "Australia/Sydney")
@@ -299,25 +300,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     tonight = mode == "tonight"
     due = window_filter(collected, now, horizon, tonight=tonight)
-    write_due_page(page_path, due, now, mode, horizon)
 
     if args.open:
-        subprocess.run(["open", str(page_path)], check=False)
-        print(page_path)
+        subprocess.run(["open", site_url], check=False)
+        print(site_url)
         return 0
 
     if not due:
         if args.dry_run:
             print("No upcoming dues." if not tonight else "No overdue today-only dues for tonight.")
-            print(f"mode={mode} count=0 page={page_path}")
+            print(f"mode={mode} count=0 site={site_url}")
         else:
             write_last_run(state_path, now)
         return 0
 
     title = "Overdue tonight" if tonight else "Upcoming dues"
-    notify(title, format_body(due, now), args.dry_run, page=page_path)
+    notify(title, format_body(due, now), args.dry_run, target=site_url)
     if args.dry_run:
-        print(f"mode={mode} count={len(due)} page={page_path}")
+        print(f"mode={mode} count={len(due)} site={site_url}")
         for item in due:
             print(f"- {item.source} {item.line(now)}")
     else:

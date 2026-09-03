@@ -3,7 +3,7 @@ import Foundation
 import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
-    private let defaultsKey = "latestDuePage"
+    private let defaultsKey = "latestOpenTarget"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
@@ -12,32 +12,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if args.count >= 2 {
             let title = args[0]
             let body = args[1]
-            let openPath = args.count >= 3 ? args[2] : Self.defaultPagePath()
-            UserDefaults.standard.set(openPath, forKey: defaultsKey)
-            postNotification(title: title, body: body, openPath: openPath)
+            let openTarget = args.count >= 3 ? args[2] : Self.defaultOpenTarget()
+            UserDefaults.standard.set(openTarget, forKey: defaultsKey)
+            postNotification(title: title, body: body, openTarget: openTarget)
         } else {
-            openLatestPage()
+            openLatestTarget()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 NSApp.terminate(nil)
             }
         }
     }
 
-    private static func defaultPagePath() -> String {
-        NSString(string: "~/.local/state/due-board/dues.html").expandingTildeInPath
+    /// Hardcoded last-resort target — can be overridden at runtime by passing
+    /// a third argument (used by `remind.py` which reads `config.yaml.site_url`).
+    private static func defaultOpenTarget() -> String {
+        "https://usyd-due-web.onrender.com"
     }
 
-    private func openLatestPage() {
-        let path = UserDefaults.standard.string(forKey: defaultsKey) ?? Self.defaultPagePath()
-        let url = URL(fileURLWithPath: path)
-        if FileManager.default.fileExists(atPath: path) {
-            NSWorkspace.shared.open(url)
-        } else {
-            fputs("No due page at \(path)\n", stderr)
+    /// Build a URL from a string that may be an http(s) link, a file path,
+    /// or an already-scheme-qualified URL. Never crashes on malformed input.
+    private static func makeURL(_ raw: String) -> URL? {
+        if let u = URL(string: raw), u.scheme != nil {
+            return u
         }
+        // Treat anything else as a local file path.
+        return URL(fileURLWithPath: raw)
     }
 
-    private func postNotification(title: String, body: String, openPath: String) {
+    private func openLatestTarget() {
+        let target = UserDefaults.standard.string(forKey: defaultsKey) ?? Self.defaultOpenTarget()
+        guard let url = Self.makeURL(target) else {
+            fputs("Unable to parse open target: \(target)\n", stderr)
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func postNotification(title: String, body: String, openTarget: String) {
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error = error {
@@ -50,9 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     "notification permission not granted — enable DueBoard in System Settings → Notifications\n",
                     stderr
                 )
-                // Still open the page so the user sees details.
+                // Still open the target so the user sees details.
                 DispatchQueue.main.async {
-                    NSWorkspace.shared.open(URL(fileURLWithPath: openPath))
+                    if let url = Self.makeURL(openTarget) {
+                        NSWorkspace.shared.open(url)
+                    }
                     NSApp.terminate(nil)
                 }
                 return
@@ -62,8 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             content.title = title
             content.body = body
             content.sound = .default
-            content.userInfo = ["openPath": openPath]
-            // Help the system associate clicks with this app.
+            content.userInfo = ["openTarget": openTarget]
             content.categoryIdentifier = "DUE_SUMMARY"
 
             let request = UNNotificationRequest(
@@ -75,8 +87,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 if let error = error {
                     fputs("notify error: \(error.localizedDescription)\n", stderr)
                 }
-                // Keep the process alive briefly so an immediate click can be handled;
-                // later clicks relaunch the app with no args and open the saved page.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     NSApp.terminate(nil)
                 }
@@ -98,10 +108,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let info = response.notification.request.content.userInfo
-        let path = (info["openPath"] as? String)
+        let target = (info["openTarget"] as? String)
             ?? UserDefaults.standard.string(forKey: defaultsKey)
-            ?? Self.defaultPagePath()
-        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            ?? Self.defaultOpenTarget()
+        if let url = Self.makeURL(target) {
+            NSWorkspace.shared.open(url)
+        }
         completionHandler()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             NSApp.terminate(nil)

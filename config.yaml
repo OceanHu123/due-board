@@ -4,6 +4,7 @@ canvas_env: /Users/oakley/Projects/mcp/canvas-mcp/.env
 ed_env: /Users/oakley/Projects/mcp/ed-mcp/.env
 state_file: /Users/oakley/.local/state/due-board/last-run
 catch_up_hours: 20
+site_url: https://usyd-due-web.onrender.com
 
 exclude_title_substrings:
   - Drill
