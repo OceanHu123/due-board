@@ -163,25 +163,19 @@ def _board_context(
 def home(request: Request, db: Session = Depends(get_db)):
     user = get_board_user(db)
     ensure_default_courses(db, user)
-    flash_synced: str | None = None
-    auto_error: str | None = None
     synced = request.query_params.get("synced")
-    if synced is None and _sync_stale(user):
-        try:
-            sync_user_dues(db, user)
-            flash_synced = "Auto-refreshed remaining items."
-            db.refresh(user)
-        except Exception as exc:  # noqa: BLE001
-            auto_error = str(exc)[:120]
-            db.refresh(user)
-    elif synced:
-        flash_synced = "Refreshed — showing only unfinished dues."
+    flash_synced = "Refreshed — showing only unfinished dues." if synced else None
+    # Render free-tier cold-starts take 30-50s; on top of that, sync-ing
+    # Canvas/Ed API calls during the homepage request doubles the wait.
+    # Instead, return cached data immediately and let the front-end fire
+    # an htmx background refresh once the page is interactive.
+    needs_background_sync = _sync_stale(user)
     ctx = _board_context(
         db, user, request,
         flash_synced=flash_synced,
         flash_error=request.query_params.get("error"),
-        auto_error=auto_error,
     )
+    ctx["needs_background_sync"] = needs_background_sync
     if _is_htmx(request):
         return templates.TemplateResponse(request, "partials/board_items.html", ctx)
     return templates.TemplateResponse(request, "board.html", ctx)

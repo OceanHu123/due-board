@@ -9,7 +9,7 @@
     <array>
         <string>/bin/zsh</string>
         <string>-lc</string>
-        <string>cd "$HOME/Projects/usyd-due-reminders" && uv run due-board 2>&1 | tee -a "$HOME/.local/state/due-board/launchd.log"</string>
+        <string>cd "$HOME/Projects/usyd-due-reminders" &amp;&amp; uv run due-board 2&gt;&amp;1 | tee -a "$HOME/.local/state/due-board/launchd.log"</string>
     </array>
 
     <key>WorkingDirectory</key>
@@ -17,9 +17,11 @@
 
     <key>StartCalendarInterval</key>
     <dict>
-        <!-- Twice hourly, at x:07 and x:37 — catches morning (08:00) and evening (18:00) send windows. -->
+        <!-- Daily 15:00 local time — single afternoon summary reminder. -->
+        <key>Hour</key>
+        <integer>15</integer>
         <key>Minute</key>
-        <integer>7</integer>
+        <integer>0</integer>
     </dict>
 
     <key>RunAtLoad</key>

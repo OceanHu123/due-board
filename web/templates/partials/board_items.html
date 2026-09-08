@@ -9,6 +9,16 @@
     <p class="muted">Last sync: {{ last_sync_label }}</p>
   {% endif %}
 
+  {% if needs_background_sync and (user.canvas_token_enc or user.ed_token_enc) %}
+    <p class="muted" id="auto-sync-hint" style="margin:0.5rem 0">
+      <span class="spinner" style="display:inline-block;border-color:rgba(0,0,0,0.2);border-top-color:var(--accent)"></span>
+      Refreshing in background…
+    </p>
+    <div hx-post="/refresh" hx-target="#board-region" hx-swap="outerHTML"
+         hx-trigger="load" hx-indicator="#auto-sync-hint"
+         style="display:none"></div>
+  {% endif %}
+
   <p style="margin:1rem 0">
     <a class="btn btn-when-loading" href="/refresh"
        hx-post="/refresh" hx-target="#board-region" hx-swap="outerHTML">
