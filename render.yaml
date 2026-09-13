@@ -1,7 +1,14 @@
-# Render Blueprint — free tier: Web + Postgres only (no Worker).
-# Workers are not available on the free plan.
-# No custom domain required: https://<service>.onrender.com
-# See docs/DEPLOY_RENDER.md
+# Render Blueprint — free tier: Web only + external Postgres.
+#
+# Why no Render Postgres here: Render's *free* Postgres expires 30 days after
+# creation (14-day grace, then the data is deleted, no backups). We use an
+# always-free external database instead (Neon) and set DATABASE_URL by hand.
+#
+# The `databases:` block was removed on purpose. Blueprint sync never deletes
+# an existing resource, so the old Render Postgres stays alive until you delete
+# it yourself in the dashboard — keep it until the Neon migration is verified.
+#
+# See docs/DEPLOY_RENDER.md (section "Migrating off Render Postgres").
 
 services:
   - type: web
@@ -14,12 +21,14 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      # Never regenerate this after the first deploy: it decrypts the Canvas/Ed
+      # tokens stored in the database. Rotating it orphans every saved token.
       - key: TOKEN_FERNET_KEY
         sync: false
+      # External Postgres connection string (Neon free tier). Paste it in the
+      # Render dashboard — Render never manages this value.
       - key: DATABASE_URL
-        fromDatabase:
-          name: due-board-db
-          property: connectionString
+        sync: false
       - key: REQUIRE_MAIL
         value: "false"
       - key: RESEND_API_KEY
@@ -28,7 +37,3 @@ services:
         sync: false
       - key: GITHUB_URL
         value: https://github.com/OceanHu123/due-board
-
-databases:
-  - name: due-board-db
-    plan: free

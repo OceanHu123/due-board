@@ -88,11 +88,12 @@ Without `RESEND_API_KEY` / SMTP, magic links print on the login page and in the 
 
 1. Create a [Resend](https://resend.com) API key and verified `from` address.
 2. Generate Fernet key: `python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'`
-3. Blueprint: connect the repo and apply [`render.yaml`](render.yaml) (web + worker + Postgres).
-4. Set env: `BASE_URL=https://<service>.onrender.com`, `TOKEN_FERNET_KEY`, `RESEND_API_KEY`, `SMTP_FROM`, `REQUIRE_MAIL=true`.
-5. Health check: `/healthz`. Worker command: `due-board-worker` (run every 10–15 minutes or as a background worker loop via cron).
+3. Blueprint: connect the repo and apply [`render.yaml`](render.yaml) (web only).
+4. Database: Render's free Postgres expires after 30 days — create a free [Neon](https://neon.tech) database instead and set `DATABASE_URL` to its connection string ([migration steps](docs/DEPLOY_RENDER.md#7-migrating-off-render-postgres)).
+5. Set env: `BASE_URL=https://<service>.onrender.com`, `TOKEN_FERNET_KEY`, plus mail vars if you want email reminders.
+6. Health check: `/healthz`.
 
-`postgres://` URLs from Render are normalized to `postgresql+psycopg://`.
+`postgres://` and `postgresql://` URLs are normalized to `postgresql+psycopg://`.
 
 Docker: `Dockerfile` installs `.[postgres]`.
 
